@@ -1,0 +1,23 @@
+package server.sassedo.model;
+
+public enum GenericExceptionCode {
+    // USER
+    USER_NOT_FOUND,
+    EMAIL_ALREADY_EXISTS,
+    PASSWORD_NOT_STRONG,
+    INCORRECT_PASSWORD,
+    TOKEN_NOT_FOUND,
+    TOKEN_EXPIRED,
+    TOKEN_ALREADY_USED,
+    INVALID_TOKEN,
+    USER_ALREADY_VERIFIED,
+    INVALID_VERIFICATION_CODE,
+    NOT_VERIFIED,
+
+    // COMMON
+    HELPER_TEXT_NOT_FOUND,
+    FAQ_NOT_FOUND,
+
+    // CARD
+    CARD_NOT_FOUND,
+}
