@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -36,10 +37,49 @@ public class User {
     @Size(min = 3, max = 60)
     private String name;
 
+    @Size(max = 60)
+    private String firstName;
+
+    @Size(max = 60)
+    private String lastName;
+
+    @Size(max = 30)
+    private String phone;
+
+    @Lob
+    @Column(columnDefinition = "MEDIUMBLOB")
+    private byte[] profilePhoto;
+
+    @Size(max = 100)
+    private String city;
+
+    private Integer age;
+
+    @Enumerated(EnumType.STRING)
+    private Sex sex;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @Enumerated(EnumType.STRING)
+    @CollectionTable(name = "user_languages", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "language")
+    private Set<Language> languages = new LinkedHashSet<>();
+
+    @Enumerated(EnumType.STRING)
+    private JobStatus jobStatus;
+
+    private Boolean smoker;
+
+    private Boolean hasPets;
+
+    @Column(length = 1000)
+    private String shortDescription;
+
     @Size(max = 64)
     private String verificationCode;
 
     private boolean enabled;
+
+    private boolean blocked;
 
     @ManyToMany()
     @JoinTable(name = "user_roles",
@@ -74,5 +114,29 @@ public class User {
         this.gdprAcceptedAt = LocalDateTime.now();
         this.isMarketingConsentAccepted = true;
         this.marketingConsentAcceptedAt = LocalDateTime.now();
+    }
+
+    public User(String email, String password, String firstName, String lastName, String phone,
+                String verificationCode, boolean acceptedTerms, boolean acceptedGdpr) {
+        this.email = email;
+        this.password = password;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.phone = phone;
+        this.name = buildFullName(firstName, lastName);
+        this.verificationCode = verificationCode;
+
+        LocalDateTime now = LocalDateTime.now();
+        this.isTermsAndConditionsAccepted = acceptedTerms;
+        this.termsAndConditionsAcceptedAt = acceptedTerms ? now : null;
+        this.isGdprAccepted = acceptedGdpr;
+        this.gdprAcceptedAt = acceptedGdpr ? now : null;
+    }
+
+    private static String buildFullName(String firstName, String lastName) {
+        return String.join(" ",
+                        firstName == null ? "" : firstName.trim(),
+                        lastName == null ? "" : lastName.trim())
+                .trim();
     }
 }

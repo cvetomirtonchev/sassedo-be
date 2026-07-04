@@ -2,9 +2,12 @@ package server.sassedo.user.service.user;
 
 import lombok.RequiredArgsConstructor;
 import java.security.SecureRandom;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
 import server.sassedo.user.data.dto.ERole;
@@ -20,6 +23,7 @@ import server.sassedo.user.service.EmailVerificationService;
 import server.sassedo.utils.PasswordValidator;
 
 import jakarta.mail.MessagingException;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -45,8 +49,21 @@ public class UserServiceImpl implements UserService {
             throw new GenericException(GenericExceptionCode.PASSWORD_NOT_STRONG, "Error: Password is not strong enough!");
         }
 
+        if (!signUpRequest.isAcceptedTerms() || !signUpRequest.isAcceptedGdpr()) {
+            throw new GenericException(GenericExceptionCode.CONSENT_REQUIRED, "Error: Terms and privacy policy must be accepted!");
+        }
+
         // Create new user's account
-        User user = new User(signUpRequest.getEmail(), encoder.encode(signUpRequest.getPassword()), signUpRequest.getName(), generateRandomString(64));
+        User user = new User(
+                signUpRequest.getEmail(),
+                encoder.encode(signUpRequest.getPassword()),
+                signUpRequest.getFirstName(),
+                signUpRequest.getLastName(),
+                signUpRequest.getPhone(),
+                generateRandomString(64),
+                signUpRequest.isAcceptedTerms(),
+                signUpRequest.isAcceptedGdpr()
+        );
 
         Set<Role> roles = new HashSet<>();
         Role userRole = roleRepository.findByName(ERole.ROLE_USER).orElseThrow(() -> new RuntimeException("Error: Role is not found."));
@@ -144,6 +161,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public Page<User> searchUsers(String search, Pageable pageable) {
+        return userRepository.searchUsers(search, pageable);
+    }
+
+    @Override
     public void updatePassword(Long userId, UpdatePasswordRequest updatePasswordRequest) throws GenericException {
         User user = userRepository.findById(userId).orElseThrow(() -> new GenericException(GenericExceptionCode.USER_NOT_FOUND, "User not found"));
         if (!PasswordValidator.isPasswordStrong(updatePasswordRequest.getNewPassword())) {
@@ -190,6 +212,71 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
+    public User adminUpdateUser(AdminUpdateUserRequest request) throws GenericException {
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new GenericException(GenericExceptionCode.USER_NOT_FOUND, "User not found"));
+
+        if (request.getFirstName() != null) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            user.setLastName(request.getLastName());
+        }
+        if (request.getFirstName() != null || request.getLastName() != null) {
+            user.setName(buildFullName(user.getFirstName(), user.getLastName()));
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getVerified() != null) {
+            user.setEnabled(request.getVerified());
+        }
+        if (request.getCity() != null) {
+            user.setCity(request.getCity());
+        }
+        if (request.getAge() != null) {
+            user.setAge(request.getAge());
+        }
+        if (request.getSex() != null) {
+            user.setSex(request.getSex());
+        }
+        if (request.getLanguages() != null) {
+            user.setLanguages(new LinkedHashSet<>(request.getLanguages()));
+        }
+        if (request.getJobStatus() != null) {
+            user.setJobStatus(request.getJobStatus());
+        }
+        if (request.getSmoker() != null) {
+            user.setSmoker(request.getSmoker());
+        }
+        if (request.getHasPets() != null) {
+            user.setHasPets(request.getHasPets());
+        }
+        if (request.getShortDescription() != null) {
+            user.setShortDescription(request.getShortDescription());
+        }
+
+        try {
+            if (request.getEmail() != null) {
+                user.setEmail(request.getEmail());
+            }
+            return userRepository.save(user);
+        } catch (Exception e) {
+            throw new GenericException(GenericExceptionCode.EMAIL_ALREADY_EXISTS, "Email already exists");
+        }
+    }
+
+    @Override
+    @Transactional
+    public User setBlocked(Long userId, boolean blocked) throws GenericException {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new GenericException(GenericExceptionCode.USER_NOT_FOUND, "User not found"));
+        user.setBlocked(blocked);
+        return userRepository.save(user);
+    }
+
+    @Override
     public void sendVerificationCode(String email) throws MessagingException, UnsupportedEncodingException {
         User user = userRepository.findByEmail(email);
         if (!user.isEnabled()) {
@@ -217,6 +304,97 @@ public class UserServiceImpl implements UserService {
         }
 
         return userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public User updateProfile(Long userId, UpdateProfileRequest request) throws GenericException {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new GenericException(GenericExceptionCode.USER_NOT_FOUND, "User not found"));
+
+        if (request.getFirstName() != null) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            user.setLastName(request.getLastName());
+        }
+        if (request.getFirstName() != null || request.getLastName() != null) {
+            user.setName(buildFullName(user.getFirstName(), user.getLastName()));
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getCity() != null) {
+            user.setCity(request.getCity());
+        }
+        if (request.getAge() != null) {
+            user.setAge(request.getAge());
+        }
+        if (request.getSex() != null) {
+            user.setSex(request.getSex());
+        }
+        if (request.getLanguages() != null) {
+            user.setLanguages(new LinkedHashSet<>(request.getLanguages()));
+        }
+        if (request.getJobStatus() != null) {
+            user.setJobStatus(request.getJobStatus());
+        }
+        if (request.getSmoker() != null) {
+            user.setSmoker(request.getSmoker());
+        }
+        if (request.getHasPets() != null) {
+            user.setHasPets(request.getHasPets());
+        }
+        if (request.getShortDescription() != null) {
+            user.setShortDescription(request.getShortDescription());
+        }
+
+        return userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public User updateProfilePhoto(Long userId, MultipartFile file) throws GenericException, IOException {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new GenericException(GenericExceptionCode.USER_NOT_FOUND, "User not found"));
+        if (file == null || file.isEmpty()) {
+            throw new GenericException(GenericExceptionCode.INVALID_FILE, "No file provided");
+        }
+        user.setProfilePhoto(file.getBytes());
+        return userRepository.save(user);
+    }
+
+    @Override
+    public byte[] getProfilePhoto(Long userId) throws GenericException {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new GenericException(GenericExceptionCode.USER_NOT_FOUND, "User not found"));
+        return user.getProfilePhoto();
+    }
+
+    @Override
+    public boolean isProfileComplete(User user) {
+        return user.getProfilePhoto() != null && user.getProfilePhoto().length > 0
+                && hasText(user.getFirstName())
+                && hasText(user.getLastName())
+                && hasText(user.getPhone())
+                && hasText(user.getCity())
+                && user.getAge() != null
+                && user.getSex() != null
+                && user.getLanguages() != null && !user.getLanguages().isEmpty()
+                && user.getJobStatus() != null
+                && user.getSmoker() != null
+                && user.getHasPets() != null;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private static String buildFullName(String firstName, String lastName) {
+        return String.join(" ",
+                        firstName == null ? "" : firstName.trim(),
+                        lastName == null ? "" : lastName.trim())
+                .trim();
     }
 
     @Override

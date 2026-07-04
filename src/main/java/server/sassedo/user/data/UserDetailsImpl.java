@@ -29,14 +29,17 @@ public class UserDetailsImpl implements UserDetails {
 
     private final boolean isEmailVerified;
 
+    private final boolean blocked;
+
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public UserDetailsImpl(Long id, String email, String password, String name, boolean isEmailVerified, Collection<? extends GrantedAuthority> authorities) {
+    public UserDetailsImpl(Long id, String email, String password, String name, boolean isEmailVerified, boolean blocked, Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.email = email;
         this.password = password;
         this.name = name;
         this.isEmailVerified = isEmailVerified;
+        this.blocked = blocked;
         this.authorities = authorities;
     }
 
@@ -51,6 +54,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getPassword(),
                 user.getName(),
                 user.isEnabled(),
+                user.isBlocked(),
                 authorities
         );
     }
@@ -77,7 +81,7 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return !blocked;
     }
 
     @Override

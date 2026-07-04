@@ -3,8 +3,12 @@ package server.sassedo.user.data.network.response;
 import lombok.Getter;
 import lombok.Setter;
 import server.sassedo.user.data.dto.ERole;
+import server.sassedo.user.data.dto.JobStatus;
+import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.dto.Sex;
 
 import java.util.List;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -15,11 +19,39 @@ public class UserResponse {
 
     private String name;
 
+    private String firstName;
+
+    private String lastName;
+
+    private String phone;
+
     private boolean isVerified;
+
+    private boolean blocked;
 
     private List<ERole> roles;
 
     private boolean isMarketingConsentAccepted;
+
+    private String profilePhotoUrl;
+
+    private String city;
+
+    private Integer age;
+
+    private Sex sex;
+
+    private Set<Language> languages;
+
+    private JobStatus jobStatus;
+
+    private Boolean smoker;
+
+    private Boolean hasPets;
+
+    private String shortDescription;
+
+    private boolean profileComplete;
 
     public UserResponse(Long id, String email, String name, boolean isVerified, List<ERole> roles, boolean isMarketingConsentAccepted) {
         this.id = id;

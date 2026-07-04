@@ -1,17 +1,28 @@
 package server.sassedo.user.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import server.sassedo.common.data.network.response.PageMeta;
+import server.sassedo.common.data.network.response.PagedResponse;
 import server.sassedo.model.GenericException;
 import server.sassedo.security.jwt.JwtUtils;
 import server.sassedo.user.data.UserDetailsImpl;
 import server.sassedo.user.data.dto.Role;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.data.network.UpdateUserRequest;
+import server.sassedo.user.data.network.request.AdminBlockUserRequest;
+import server.sassedo.user.data.network.request.AdminUpdateUserRequest;
 import server.sassedo.user.data.network.request.UpdatePasswordRequest;
+import server.sassedo.user.data.network.request.UpdateProfileRequest;
 import server.sassedo.user.data.network.request.UpdateUserPreferencesRequest;
 import server.sassedo.user.data.network.request.UpdateUserRoleRequest;
 import server.sassedo.user.data.network.response.UserResponse;
@@ -19,6 +30,8 @@ import server.sassedo.user.data.network.response.UserRolesResponse;
 import server.sassedo.user.service.user.UserService;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -68,6 +81,45 @@ public class UserController {
         }
     }
 
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(@Valid @RequestBody UpdateProfileRequest request, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            User user = userService.updateProfile(userId, request);
+            return ResponseEntity.ok(mapUserToResponse(user));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @PostMapping(value = "/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadProfilePicture(@RequestParam("file") MultipartFile file, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            User user = userService.updateProfilePhoto(userId, file);
+            return ResponseEntity.ok(mapUserToResponse(user));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body("Could not read uploaded file");
+        }
+    }
+
+    @GetMapping("/{id}/picture")
+    public ResponseEntity<byte[]> getProfilePicture(@PathVariable Long id) {
+        try {
+            byte[] image = userService.getProfilePhoto(id);
+            if (image == null || image.length == 0) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok()
+                    .contentType(MediaType.IMAGE_JPEG)
+                    .body(image);
+        } catch (GenericException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @PutMapping("/update-preferences")
     public ResponseEntity<?> updateUserPreferences(
             @RequestBody UpdateUserPreferencesRequest request,
@@ -82,10 +134,30 @@ public class UserController {
     }
 
     @PutMapping("/admin/update")
-    public ResponseEntity<?> updateUserByAdmin(@RequestBody UpdateUserRequest updateUserRequest, HttpServletRequest request) {
+    public ResponseEntity<?> updateUserByAdmin(@Valid @RequestBody AdminUpdateUserRequest updateUserRequest, HttpServletRequest request) {
         try {
-            User user = userService.updateUser(updateUserRequest);
+            User user = userService.adminUpdateUser(updateUserRequest);
             return ResponseEntity.ok(mapUserToResponse(user));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @PutMapping("/admin/block")
+    public ResponseEntity<?> setUserBlocked(@RequestBody AdminBlockUserRequest blockUserRequest) {
+        try {
+            User user = userService.setBlocked(blockUserRequest.getUserId(), blockUserRequest.isBlocked());
+            return ResponseEntity.ok(mapUserToResponse(user));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @DeleteMapping("/admin/{id}")
+    public ResponseEntity<?> deleteUserByAdmin(@PathVariable Long id) {
+        try {
+            userService.deleteUser(id);
+            return ResponseEntity.ok().build();
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());
         }
@@ -108,10 +180,15 @@ public class UserController {
     }
 
     @GetMapping("/admin/all")
-    public ResponseEntity<?> getAll(HttpServletRequest request) {
-        List<User> user = userService.getAllUsers();
-        List<UserResponse> userResponses = user.stream().map(this::mapUserToResponse).collect(Collectors.toList());
-        return ResponseEntity.ok(userResponses);
+    public ResponseEntity<?> getAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "40") int size) {
+        Page<User> users = userService.searchUsers(search, PageRequest.of(page, size, Sort.by("id")));
+        List<UserResponse> content = users.getContent().stream()
+                .map(this::mapUserToResponse).collect(Collectors.toList());
+        PageMeta meta = new PageMeta(users.getNumber(), users.getTotalPages(), users.getTotalElements());
+        return ResponseEntity.ok(new PagedResponse<>(content, meta));
     }
 
     @GetMapping("/admin/roles")
@@ -142,12 +219,36 @@ public class UserController {
     }
 
     private UserResponse mapUserToResponse(User user) {
-        return new UserResponse(user.getId(),
+        UserResponse response = new UserResponse(user.getId(),
                 user.getEmail(),
                 user.getName(),
                 user.isEnabled(),
                 user.getRoles().stream().map(Role::getName).collect(Collectors.toList()),
                 user.isMarketingConsentAccepted()
         );
+        response.setBlocked(user.isBlocked());
+        response.setFirstName(user.getFirstName());
+        response.setLastName(user.getLastName());
+        response.setPhone(user.getPhone());
+        response.setCity(user.getCity());
+        response.setAge(user.getAge());
+        response.setSex(user.getSex());
+        response.setLanguages(user.getLanguages());
+        response.setJobStatus(user.getJobStatus());
+        response.setSmoker(user.getSmoker());
+        response.setHasPets(user.getHasPets());
+        response.setShortDescription(user.getShortDescription());
+        response.setProfileComplete(userService.isProfileComplete(user));
+
+        if (user.getProfilePhoto() != null && user.getProfilePhoto().length > 0) {
+            String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/api/user/")
+                    .path(String.valueOf(user.getId()))
+                    .path("/picture")
+                    .toUriString();
+            response.setProfilePhotoUrl(photoUrl);
+        }
+
+        return response;
     }
 }

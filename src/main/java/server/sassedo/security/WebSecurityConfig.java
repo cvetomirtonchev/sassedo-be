@@ -70,6 +70,7 @@ public class WebSecurityConfig {
                         .requestMatchers(RegexRequestMatcher.regexMatcher("/api/.*/moderator.*")).hasAnyRole("MODERATOR", "ADMIN")
                         .requestMatchers("/api/questions/ask").permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher("/api/cards/\\d+/picture")).permitAll()
+                        .requestMatchers(RegexRequestMatcher.regexMatcher("/api/user/\\d+/picture")).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher("/api/deeplink/.*")).permitAll()
                         .anyRequest().authenticated()
                 );

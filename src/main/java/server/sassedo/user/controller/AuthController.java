@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -51,12 +52,21 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
 
-        Authentication authentication = authenticationManager
-                .authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
+        Authentication authentication;
+        try {
+            authentication = authenticationManager
+                    .authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
+        } catch (LockedException e) {
+            return ResponseEntity.badRequest().body(new GenericException(GenericExceptionCode.USER_BLOCKED, "User is blocked").getErrorResponse());
+        }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        if (userDetails.isBlocked()) {
+            return ResponseEntity.badRequest().body(new GenericException(GenericExceptionCode.USER_BLOCKED, "User is blocked").getErrorResponse());
+        }
 
         if (!userDetails.isEmailVerified()) {
             return ResponseEntity.badRequest().body(new GenericException(GenericExceptionCode.NOT_VERIFIED, "Not verified").getErrorResponse());
@@ -111,6 +121,7 @@ public class AuthController {
                     user.getPassword(),
                     user.getName(),
                     user.isEnabled(),
+                    user.isBlocked(),
                     authorities
             );
 
