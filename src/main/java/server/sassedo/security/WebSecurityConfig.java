@@ -2,6 +2,7 @@ package server.sassedo.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
@@ -66,6 +67,8 @@ public class WebSecurityConfig {
                         .requestMatchers("/api/lost-password/**").permitAll()
                         .requestMatchers("/api/common/helper-texts").permitAll()
                         .requestMatchers("/api/notification/fcm-token").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/countries").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/countries/*/cities").permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher("/api/.*/admin.*")).hasRole("ADMIN")
                         .requestMatchers(RegexRequestMatcher.regexMatcher("/api/.*/moderator.*")).hasAnyRole("MODERATOR", "ADMIN")
                         .requestMatchers("/api/questions/ask").permitAll()

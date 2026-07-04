@@ -23,4 +23,10 @@ public enum GenericExceptionCode {
 
     // CARD
     CARD_NOT_FOUND,
+
+    // LOCATION
+    COUNTRY_NOT_FOUND,
+    CITY_NOT_FOUND,
+    COUNTRY_ALREADY_EXISTS,
+    CITY_ALREADY_EXISTS,
 }
