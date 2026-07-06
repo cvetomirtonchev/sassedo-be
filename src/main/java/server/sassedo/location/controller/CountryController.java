@@ -2,8 +2,10 @@ package server.sassedo.location.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
 import server.sassedo.location.data.network.request.AddCityRequest;
@@ -16,6 +18,7 @@ import server.sassedo.location.service.city.CityService;
 import server.sassedo.location.service.country.CountryService;
 import server.sassedo.model.GenericException;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,6 +48,36 @@ public class CountryController {
             return ResponseEntity.ok(cities);
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @GetMapping("/cities/popular")
+    public ResponseEntity<?> getPopularCities(@RequestParam(defaultValue = "5") int limit) {
+        List<CityResponse> cities = cityService.getPopular(limit).stream()
+                .map(cwc -> mapCityToResponse(cwc.city(), cwc.listingCount()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(cities);
+    }
+
+    @GetMapping("/cities/{id}/image")
+    public ResponseEntity<byte[]> getCityImage(@PathVariable Long id) {
+        try {
+            City city = cityService.getById(id);
+            byte[] data = city.getImage();
+            if (data == null || data.length == 0) {
+                return ResponseEntity.notFound().build();
+            }
+            MediaType mediaType = MediaType.IMAGE_JPEG;
+            if (city.getImageContentType() != null) {
+                try {
+                    mediaType = MediaType.parseMediaType(city.getImageContentType());
+                } catch (Exception ignored) {
+                    // fall back to jpeg
+                }
+            }
+            return ResponseEntity.ok().contentType(mediaType).body(data);
+        } catch (GenericException e) {
+            return ResponseEntity.notFound().build();
         }
     }
 
@@ -98,6 +131,18 @@ public class CountryController {
         }
     }
 
+    @PostMapping(value = "/admin/cities/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadCityImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        try {
+            City city = cityService.updateImage(id, file);
+            return ResponseEntity.ok(mapCityToResponse(city));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body("Could not read uploaded file");
+        }
+    }
+
     @DeleteMapping("/admin/cities/{id}")
     public ResponseEntity<?> deleteCity(@PathVariable Long id) {
         try {
@@ -116,6 +161,12 @@ public class CountryController {
     }
 
     private CityResponse mapCityToResponse(City city) {
-        return new CityResponse(city.getId(), city.getNameEn(), city.getNameBg(), city.getCountry().getId());
+        return mapCityToResponse(city, 0L);
+    }
+
+    private CityResponse mapCityToResponse(City city, long listingCount) {
+        boolean hasImage = city.getImage() != null && city.getImage().length > 0;
+        return new CityResponse(city.getId(), city.getNameEn(), city.getNameBg(), city.getCountry().getId(),
+                listingCount, hasImage);
     }
 }
