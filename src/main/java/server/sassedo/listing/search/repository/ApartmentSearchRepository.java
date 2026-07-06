@@ -3,6 +3,7 @@ package server.sassedo.listing.search.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -10,6 +11,7 @@ import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.search.data.dto.ApartmentSearch;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -25,6 +27,18 @@ public interface ApartmentSearchRepository extends JpaRepository<ApartmentSearch
                                  @Param("cityId") Long cityId,
                                  @Param("propertyType") PropertyType propertyType,
                                  Pageable pageable);
+
+    @Modifying
+    @Query("UPDATE ApartmentSearch s SET s.status = server.sassedo.listing.common.ListingStatus.EXPIRED, s.updatedAt = :now " +
+            "WHERE s.status = server.sassedo.listing.common.ListingStatus.ACTIVE " +
+            "AND s.expiresAt IS NOT NULL AND s.expiresAt <= :now " +
+            "AND (s.promotionState.promotedUntil IS NULL OR s.promotionState.promotedUntil <= :now)")
+    int expireOverdue(@Param("now") LocalDateTime now);
+
+    @Modifying
+    @Query("UPDATE ApartmentSearch s SET s.expiresAt = :expiresAt " +
+            "WHERE s.status = server.sassedo.listing.common.ListingStatus.ACTIVE AND s.expiresAt IS NULL")
+    int backfillMissingExpiry(@Param("expiresAt") LocalDateTime expiresAt);
 
     @Query("SELECT s FROM ApartmentSearch s WHERE " +
             "(:status IS NULL OR s.status = :status) " +

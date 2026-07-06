@@ -4,5 +4,6 @@ public enum ListingStatus {
     PENDING,
     ACTIVE,
     REJECTED,
-    INACTIVE
+    INACTIVE,
+    EXPIRED
 }

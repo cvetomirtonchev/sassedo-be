@@ -33,6 +33,12 @@ public interface RentalListingService {
 
     RentalListing setStatus(Long id, ListingStatus status) throws GenericException;
 
+    RentalListing renew(Long id, Long ownerId) throws GenericException;
+
+    RentalListing deactivate(Long id, Long ownerId) throws GenericException;
+
+    RentalListing reactivate(Long id, Long ownerId) throws GenericException;
+
     void delete(Long id) throws GenericException;
 
     RentalListing addPhotos(Long listingId, Long ownerId, MultipartFile[] files, Integer mainIndex) throws GenericException, IOException;

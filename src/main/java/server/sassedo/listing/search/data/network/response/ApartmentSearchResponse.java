@@ -6,6 +6,7 @@ import server.sassedo.listing.common.LeaseTerm;
 import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.common.SmokerPreference;
+import server.sassedo.promotion.common.PromotionType;
 import server.sassedo.user.data.dto.Sex;
 
 import java.math.BigDecimal;
@@ -22,6 +23,7 @@ public class ApartmentSearchResponse {
     private ListingStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime expiresAt;
 
     private PropertyType propertyType;
 
@@ -49,4 +51,9 @@ public class ApartmentSearchResponse {
 
     private String title;
     private String description;
+
+    private PromotionType promotionType;
+    private int promotionPriority;
+    private LocalDateTime promotedUntil;
+    private boolean pinned;
 }

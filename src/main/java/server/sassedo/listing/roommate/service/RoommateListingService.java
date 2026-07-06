@@ -33,6 +33,12 @@ public interface RoommateListingService {
 
     RoommateListing setStatus(Long id, ListingStatus status) throws GenericException;
 
+    RoommateListing renew(Long id, Long ownerId) throws GenericException;
+
+    RoommateListing deactivate(Long id, Long ownerId) throws GenericException;
+
+    RoommateListing reactivate(Long id, Long ownerId) throws GenericException;
+
     void delete(Long id) throws GenericException;
 
     RoommateListing addPhotos(Long listingId, Long ownerId, MultipartFile[] files, Integer mainIndex) throws GenericException, IOException;

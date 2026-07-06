@@ -1,6 +1,7 @@
 package server.sassedo.listing.search.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -26,6 +28,9 @@ public class ApartmentSearchServiceImpl implements ApartmentSearchService {
     private final ApartmentSearchRepository searchRepository;
     private final CountryRepository countryRepository;
     private final CityRepository cityRepository;
+
+    @Value("${sassedo.listings.ttl-days:30}")
+    private long listingTtlDays;
 
     @Override
     @Transactional
@@ -102,7 +107,46 @@ public class ApartmentSearchServiceImpl implements ApartmentSearchService {
         }
         ApartmentSearch entity = getById(id);
         entity.setStatus(status);
+        if (status == ListingStatus.ACTIVE) {
+            entity.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
+        }
         return searchRepository.save(entity);
+    }
+
+    @Override
+    @Transactional
+    public ApartmentSearch renew(Long id, Long ownerId) throws GenericException {
+        ApartmentSearch entity = requireOwner(id, ownerId);
+        entity.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
+        if (entity.getStatus() == ListingStatus.EXPIRED) {
+            entity.setStatus(ListingStatus.ACTIVE);
+        }
+        return searchRepository.save(entity);
+    }
+
+    @Override
+    @Transactional
+    public ApartmentSearch deactivate(Long id, Long ownerId) throws GenericException {
+        ApartmentSearch entity = requireOwner(id, ownerId);
+        entity.setStatus(ListingStatus.INACTIVE);
+        return searchRepository.save(entity);
+    }
+
+    @Override
+    @Transactional
+    public ApartmentSearch reactivate(Long id, Long ownerId) throws GenericException {
+        ApartmentSearch entity = requireOwner(id, ownerId);
+        entity.setStatus(ListingStatus.ACTIVE);
+        entity.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
+        return searchRepository.save(entity);
+    }
+
+    private ApartmentSearch requireOwner(Long id, Long ownerId) throws GenericException {
+        ApartmentSearch entity = getById(id);
+        if (ownerId == null || !ownerId.equals(entity.getOwnerId())) {
+            throw new GenericException(GenericExceptionCode.NOT_LISTING_OWNER, "You are not the owner of this listing");
+        }
+        return entity;
     }
 
     @Override

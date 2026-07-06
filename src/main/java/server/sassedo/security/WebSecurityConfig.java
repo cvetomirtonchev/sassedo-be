@@ -82,6 +82,8 @@ public class WebSecurityConfig {
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/rental-listings/\\d+/picture")).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/apartment-searches").permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/apartment-searches/\\d+")).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/promotion-packages").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/payments/webhook/**").permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher("/api/.*/moderator.*")).hasAnyRole("MODERATOR", "ADMIN")
                         .requestMatchers("/api/questions/ask").permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher("/api/cards/\\d+/picture")).permitAll()

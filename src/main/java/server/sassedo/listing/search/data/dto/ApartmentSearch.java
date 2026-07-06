@@ -9,6 +9,7 @@ import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
+import server.sassedo.promotion.data.dto.PromotionState;
 import server.sassedo.user.data.dto.Sex;
 
 import java.math.BigDecimal;
@@ -20,7 +21,10 @@ import java.util.Set;
 @Getter
 @Setter
 @Entity
-@Table(name = "apartment_searches")
+@Table(name = "apartment_searches", indexes = {
+        @Index(name = "idx_search_browse",
+                columnList = "status, promotion_priority, promotion_activated_at, created_at")
+})
 public class ApartmentSearch {
 
     @Id
@@ -39,6 +43,9 @@ public class ApartmentSearch {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
 
     @Enumerated(EnumType.STRING)
     private PropertyType propertyType;
@@ -89,6 +96,9 @@ public class ApartmentSearch {
     @Lob
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Embedded
+    private PromotionState promotionState = new PromotionState();
 
     @PrePersist
     public void onCreate() {

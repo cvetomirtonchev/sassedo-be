@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import server.sassedo.common.data.network.response.PageMeta;
 import server.sassedo.common.data.network.response.PagedResponse;
+import server.sassedo.listing.common.ListingSort;
 import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.rental.data.dto.RentalListing;
@@ -57,10 +58,11 @@ public class RentalListingController {
     public ResponseEntity<?> browse(
             @RequestParam(required = false) Long cityId,
             @RequestParam(required = false) PropertyType propertyType,
+            @RequestParam(defaultValue = "NEWEST") ListingSort sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Page<RentalListing> listings = listingService.browse(cityId, propertyType,
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+                PageRequest.of(page, size, sort.toSort("rent")));
         return ResponseEntity.ok(toPagedResponse(listings));
     }
 
@@ -88,6 +90,39 @@ public class RentalListingController {
         Long userId = getUserId(httpRequest, jwtUtils);
         try {
             RentalListing listing = listingService.update(id, userId, false, request);
+            return ResponseEntity.ok(mapToResponse(listing));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @PostMapping("/{id}/renew")
+    public ResponseEntity<?> renew(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            RentalListing listing = listingService.renew(id, userId);
+            return ResponseEntity.ok(mapToResponse(listing));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @PostMapping("/{id}/deactivate")
+    public ResponseEntity<?> deactivate(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            RentalListing listing = listingService.deactivate(id, userId);
+            return ResponseEntity.ok(mapToResponse(listing));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @PostMapping("/{id}/reactivate")
+    public ResponseEntity<?> reactivate(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            RentalListing listing = listingService.reactivate(id, userId);
             return ResponseEntity.ok(mapToResponse(listing));
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());
@@ -205,6 +240,7 @@ public class RentalListingController {
         r.setStatus(listing.getStatus());
         r.setCreatedAt(listing.getCreatedAt());
         r.setUpdatedAt(listing.getUpdatedAt());
+        r.setExpiresAt(listing.getExpiresAt());
         r.setPropertyType(listing.getPropertyType());
 
         if (listing.getCountry() != null) {
@@ -240,6 +276,13 @@ public class RentalListingController {
         r.setAdditionalDetails(listing.getAdditionalDetails());
         r.setTitle(listing.getTitle());
         r.setDescription(listing.getDescription());
+
+        if (listing.getPromotionState() != null) {
+            r.setPromotionType(listing.getPromotionState().getPromotionType());
+            r.setPromotionPriority(listing.getPromotionState().getPromotionPriority());
+            r.setPromotedUntil(listing.getPromotionState().getPromotedUntil());
+            r.setPinned(listing.getPromotionState().isPinned());
+        }
 
         List<ListingPhotoResponse> photos = listing.getPhotos().stream()
                 .map(p -> new ListingPhotoResponse(p.getId(), buildPhotoUrl(p.getId()), p.isMain()))

@@ -6,6 +6,7 @@ import lombok.Setter;
 import server.sassedo.listing.common.*;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
+import server.sassedo.promotion.data.dto.PromotionState;
 import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Sex;
@@ -21,7 +22,10 @@ import java.util.Set;
 @Getter
 @Setter
 @Entity
-@Table(name = "roommate_listings")
+@Table(name = "roommate_listings", indexes = {
+        @Index(name = "idx_roommate_browse",
+                columnList = "status, promotion_priority, promotion_activated_at, created_at")
+})
 public class RoommateListing {
 
     @Id
@@ -41,6 +45,9 @@ public class RoommateListing {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
 
     // Step 1: property type
     @Enumerated(EnumType.STRING)
@@ -165,6 +172,9 @@ public class RoommateListing {
 
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RoommateListingPhoto> photos = new ArrayList<>();
+
+    @Embedded
+    private PromotionState promotionState = new PromotionState();
 
     @PrePersist
     public void onCreate() {

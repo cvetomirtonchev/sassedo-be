@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import server.sassedo.listing.common.*;
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
+import server.sassedo.promotion.common.PromotionType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,6 +21,7 @@ public class RentalListingResponse {
     private ListingStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime expiresAt;
 
     private PropertyType propertyType;
 
@@ -57,4 +59,9 @@ public class RentalListingResponse {
 
     private String mainPhotoUrl;
     private List<ListingPhotoResponse> photos;
+
+    private PromotionType promotionType;
+    private int promotionPriority;
+    private LocalDateTime promotedUntil;
+    private boolean pinned;
 }

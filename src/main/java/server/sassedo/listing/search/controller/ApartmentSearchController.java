@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import server.sassedo.common.data.network.response.PageMeta;
 import server.sassedo.common.data.network.response.PagedResponse;
+import server.sassedo.listing.common.ListingSort;
 import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.roommate.data.network.request.UpdateListingStatusRequest;
@@ -51,10 +52,11 @@ public class ApartmentSearchController {
     public ResponseEntity<?> browse(
             @RequestParam(required = false) Long cityId,
             @RequestParam(required = false) PropertyType propertyType,
+            @RequestParam(defaultValue = "NEWEST") ListingSort sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Page<ApartmentSearch> results = searchService.browse(cityId, propertyType,
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+                PageRequest.of(page, size, sort.toSort("budgetMax")));
         return ResponseEntity.ok(toPagedResponse(results));
     }
 
@@ -82,6 +84,39 @@ public class ApartmentSearchController {
         Long userId = getUserId(httpRequest, jwtUtils);
         try {
             ApartmentSearch entity = searchService.update(id, userId, false, request);
+            return ResponseEntity.ok(mapToResponse(entity));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @PostMapping("/{id}/renew")
+    public ResponseEntity<?> renew(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            ApartmentSearch entity = searchService.renew(id, userId);
+            return ResponseEntity.ok(mapToResponse(entity));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @PostMapping("/{id}/deactivate")
+    public ResponseEntity<?> deactivate(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            ApartmentSearch entity = searchService.deactivate(id, userId);
+            return ResponseEntity.ok(mapToResponse(entity));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @PostMapping("/{id}/reactivate")
+    public ResponseEntity<?> reactivate(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            ApartmentSearch entity = searchService.reactivate(id, userId);
             return ResponseEntity.ok(mapToResponse(entity));
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());
@@ -149,6 +184,7 @@ public class ApartmentSearchController {
         r.setStatus(entity.getStatus());
         r.setCreatedAt(entity.getCreatedAt());
         r.setUpdatedAt(entity.getUpdatedAt());
+        r.setExpiresAt(entity.getExpiresAt());
         r.setPropertyType(entity.getPropertyType());
 
         if (entity.getCountry() != null) {
@@ -177,6 +213,13 @@ public class ApartmentSearchController {
 
         r.setTitle(entity.getTitle());
         r.setDescription(entity.getDescription());
+
+        if (entity.getPromotionState() != null) {
+            r.setPromotionType(entity.getPromotionState().getPromotionType());
+            r.setPromotionPriority(entity.getPromotionState().getPromotionPriority());
+            r.setPromotedUntil(entity.getPromotionState().getPromotedUntil());
+            r.setPinned(entity.getPromotionState().isPinned());
+        }
         return r;
     }
 }

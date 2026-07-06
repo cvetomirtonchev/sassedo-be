@@ -1,6 +1,7 @@
 package server.sassedo.listing.roommate.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -31,6 +33,9 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     private final RoommateListingPhotoRepository photoRepository;
     private final CountryRepository countryRepository;
     private final CityRepository cityRepository;
+
+    @Value("${sassedo.listings.ttl-days:30}")
+    private long listingTtlDays;
 
     @Override
     @Transactional
@@ -108,7 +113,46 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         }
         RoommateListing listing = getById(id);
         listing.setStatus(status);
+        if (status == ListingStatus.ACTIVE) {
+            listing.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
+        }
         return listingRepository.save(listing);
+    }
+
+    @Override
+    @Transactional
+    public RoommateListing renew(Long id, Long ownerId) throws GenericException {
+        RoommateListing listing = requireOwner(id, ownerId);
+        listing.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
+        if (listing.getStatus() == ListingStatus.EXPIRED) {
+            listing.setStatus(ListingStatus.ACTIVE);
+        }
+        return listingRepository.save(listing);
+    }
+
+    @Override
+    @Transactional
+    public RoommateListing deactivate(Long id, Long ownerId) throws GenericException {
+        RoommateListing listing = requireOwner(id, ownerId);
+        listing.setStatus(ListingStatus.INACTIVE);
+        return listingRepository.save(listing);
+    }
+
+    @Override
+    @Transactional
+    public RoommateListing reactivate(Long id, Long ownerId) throws GenericException {
+        RoommateListing listing = requireOwner(id, ownerId);
+        listing.setStatus(ListingStatus.ACTIVE);
+        listing.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
+        return listingRepository.save(listing);
+    }
+
+    private RoommateListing requireOwner(Long id, Long ownerId) throws GenericException {
+        RoommateListing listing = getById(id);
+        if (ownerId == null || !ownerId.equals(listing.getOwnerId())) {
+            throw new GenericException(GenericExceptionCode.NOT_LISTING_OWNER, "You are not the owner of this listing");
+        }
+        return listing;
     }
 
     @Override

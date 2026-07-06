@@ -30,5 +30,11 @@ public interface ApartmentSearchService {
 
     ApartmentSearch setStatus(Long id, ListingStatus status) throws GenericException;
 
+    ApartmentSearch renew(Long id, Long ownerId) throws GenericException;
+
+    ApartmentSearch deactivate(Long id, Long ownerId) throws GenericException;
+
+    ApartmentSearch reactivate(Long id, Long ownerId) throws GenericException;
+
     void delete(Long id) throws GenericException;
 }
