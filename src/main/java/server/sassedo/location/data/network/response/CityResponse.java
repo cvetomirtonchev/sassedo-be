@@ -5,18 +5,24 @@ public class CityResponse {
     private String nameEn;
     private String nameBg;
     private Long countryId;
+    private String countryNameEn;
+    private String countryNameBg;
     private long listingCount;
     private boolean hasImage;
 
-    public CityResponse(Long id, String nameEn, String nameBg, Long countryId) {
-        this(id, nameEn, nameBg, countryId, 0L, false);
+    public CityResponse(Long id, String nameEn, String nameBg, Long countryId,
+                        String countryNameEn, String countryNameBg) {
+        this(id, nameEn, nameBg, countryId, countryNameEn, countryNameBg, 0L, false);
     }
 
-    public CityResponse(Long id, String nameEn, String nameBg, Long countryId, long listingCount, boolean hasImage) {
+    public CityResponse(Long id, String nameEn, String nameBg, Long countryId,
+                        String countryNameEn, String countryNameBg, long listingCount, boolean hasImage) {
         this.id = id;
         this.nameEn = nameEn;
         this.nameBg = nameBg;
         this.countryId = countryId;
+        this.countryNameEn = countryNameEn;
+        this.countryNameBg = countryNameBg;
         this.listingCount = listingCount;
         this.hasImage = hasImage;
     }
@@ -51,6 +57,22 @@ public class CityResponse {
 
     public void setCountryId(Long countryId) {
         this.countryId = countryId;
+    }
+
+    public String getCountryNameEn() {
+        return countryNameEn;
+    }
+
+    public void setCountryNameEn(String countryNameEn) {
+        this.countryNameEn = countryNameEn;
+    }
+
+    public String getCountryNameBg() {
+        return countryNameBg;
+    }
+
+    public void setCountryNameBg(String countryNameBg) {
+        this.countryNameBg = countryNameBg;
     }
 
     public long getListingCount() {

@@ -6,8 +6,11 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import server.sassedo.listing.common.PetPolicy;
+import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 
 import java.util.Set;
@@ -39,9 +42,14 @@ public class UpdateProfileRequest {
 
     private JobStatus jobStatus;
 
-    private Boolean smoker;
+    @Size(max = 100)
+    private String profession;
 
-    private Boolean hasPets;
+    private SmokerPreference smokingPreference;
+
+    private PetPolicy petPolicy;
+
+    private Occupation occupation;
 
     @Size(max = 1000)
     private String shortDescription;

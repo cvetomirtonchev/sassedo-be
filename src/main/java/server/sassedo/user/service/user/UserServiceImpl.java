@@ -247,11 +247,17 @@ public class UserServiceImpl implements UserService {
         if (request.getJobStatus() != null) {
             user.setJobStatus(request.getJobStatus());
         }
-        if (request.getSmoker() != null) {
-            user.setSmoker(request.getSmoker());
+        if (request.getProfession() != null) {
+            user.setProfession(request.getProfession());
         }
-        if (request.getHasPets() != null) {
-            user.setHasPets(request.getHasPets());
+        if (request.getSmokingPreference() != null) {
+            user.setSmokingPreference(request.getSmokingPreference());
+        }
+        if (request.getPetPolicy() != null) {
+            user.setPetPolicy(request.getPetPolicy());
+        }
+        if (request.getOccupation() != null) {
+            user.setOccupation(request.getOccupation());
         }
         if (request.getShortDescription() != null) {
             user.setShortDescription(request.getShortDescription());
@@ -339,11 +345,17 @@ public class UserServiceImpl implements UserService {
         if (request.getJobStatus() != null) {
             user.setJobStatus(request.getJobStatus());
         }
-        if (request.getSmoker() != null) {
-            user.setSmoker(request.getSmoker());
+        if (request.getProfession() != null) {
+            user.setProfession(request.getProfession());
         }
-        if (request.getHasPets() != null) {
-            user.setHasPets(request.getHasPets());
+        if (request.getSmokingPreference() != null) {
+            user.setSmokingPreference(request.getSmokingPreference());
+        }
+        if (request.getPetPolicy() != null) {
+            user.setPetPolicy(request.getPetPolicy());
+        }
+        if (request.getOccupation() != null) {
+            user.setOccupation(request.getOccupation());
         }
         if (request.getShortDescription() != null) {
             user.setShortDescription(request.getShortDescription());
@@ -382,8 +394,8 @@ public class UserServiceImpl implements UserService {
                 && user.getSex() != null
                 && user.getLanguages() != null && !user.getLanguages().isEmpty()
                 && user.getJobStatus() != null
-                && user.getSmoker() != null
-                && user.getHasPets() != null;
+                && user.getSmokingPreference() != null
+                && user.getPetPolicy() != null;
     }
 
     private boolean hasText(String value) {

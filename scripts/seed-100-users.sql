@@ -4,7 +4,7 @@
 --   * a unique email: seeduser1@sassedo.test ... seeduser100@sassedo.test
 --   * a shared BCrypt password hash for the plaintext password "Password123!"
 --     (Spring Security's BCryptPasswordEncoder accepts the $2y$ variant)
---   * a full profile (name, phone, city, age, sex, job status, smoker, pets, description)
+--   * a full profile (name, phone, city, age, sex, job status, smoking preference, pet policy, occupation, description)
 --   * enabled = 1, blocked = 0, all consent flags accepted
 --   * the ROLE_USER role (looked up by name, not a hard-coded id)
 --   * two languages (ENGLISH + a rotated second language)
@@ -35,8 +35,9 @@ BEGIN
     DECLARE vAge INT;
     DECLARE vSex VARCHAR(10);
     DECLARE vJobStatus VARCHAR(20);
-    DECLARE vSmoker BOOLEAN;
-    DECLARE vHasPets BOOLEAN;
+    DECLARE vSmokingPreference VARCHAR(20);
+    DECLARE vPetPolicy VARCHAR(20);
+    DECLARE vOccupation VARCHAR(20);
     DECLARE vShortDescription VARCHAR(1000);
     DECLARE vSecondLanguage VARCHAR(20);
     DECLARE vPassword VARCHAR(120) DEFAULT '$2y$10$LkXpDdeRlZHyNYfc3PeXh.FE4pfsbrAbDJRTZfeAjC5wbjXEivbxK';
@@ -74,8 +75,13 @@ BEGIN
             SET vSex = ELT(1 + MOD(i, 3), 'MALE', 'FEMALE', 'OTHER');
             SET vJobStatus = ELT(1 + MOD(i, 5),
                 'EMPLOYED', 'SELF_EMPLOYED', 'STUDENT', 'UNEMPLOYED', 'OTHER');
-            SET vSmoker = (MOD(i, 2) = 0);
-            SET vHasPets = (MOD(i, 3) = 0);
+            SET vSmokingPreference = ELT(1 + MOD(i, 3),
+                'SMOKER', 'NON_SMOKER', 'NO_PREFERENCE');
+            SET vPetPolicy = ELT(1 + MOD(i, 4),
+                'NOT_ALLOWED', 'DOGS', 'CATS', 'ALL_ALLOWED');
+            SET vOccupation = ELT(1 + MOD(i, 8),
+                'WORKING', 'UNEMPLOYED', 'STUDENT', 'SELF_EMPLOYED',
+                'REMOTE_WORKER', 'RETIRED', 'OTHER', 'PREFER_NOT_TO_SAY');
             SET vShortDescription = CONCAT(
                 'Hi, I am ', vFirstName, ' from ', vCity,
                 '. This is a seeded test profile number ', i, '.');
@@ -84,13 +90,13 @@ BEGIN
 
             INSERT INTO users (
                 email, password, name, first_name, last_name, phone, city, age,
-                sex, job_status, smoker, has_pets, short_description, enabled, blocked,
+                sex, job_status, smoking_preference, pet_policy, occupation, short_description, enabled, blocked,
                 is_terms_and_conditions_accepted, is_gdpr_accepted,
                 terms_and_conditions_accepted_at, gdpr_accepted_at,
                 is_marketing_consent_accepted, marketing_consent_accepted_at
             ) VALUES (
                 vEmail, vPassword, vName, vFirstName, vLastName, vPhone, vCity, vAge,
-                vSex, vJobStatus, vSmoker, vHasPets, vShortDescription, 1, 0,
+                vSex, vJobStatus, vSmokingPreference, vPetPolicy, vOccupation, vShortDescription, 1, 0,
                 1, 1,
                 NOW(), NOW(),
                 1, NOW()

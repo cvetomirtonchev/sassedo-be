@@ -2,9 +2,12 @@ package server.sassedo.user.data.network.response;
 
 import lombok.Getter;
 import lombok.Setter;
+import server.sassedo.listing.common.PetPolicy;
+import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.user.data.dto.ERole;
 import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 
 import java.util.List;
@@ -45,9 +48,13 @@ public class UserResponse {
 
     private JobStatus jobStatus;
 
-    private Boolean smoker;
+    private String profession;
 
-    private Boolean hasPets;
+    private SmokerPreference smokingPreference;
+
+    private PetPolicy petPolicy;
+
+    private Occupation occupation;
 
     private String shortDescription;
 

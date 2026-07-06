@@ -235,8 +235,10 @@ public class UserController {
         response.setSex(user.getSex());
         response.setLanguages(user.getLanguages());
         response.setJobStatus(user.getJobStatus());
-        response.setSmoker(user.getSmoker());
-        response.setHasPets(user.getHasPets());
+        response.setProfession(user.getProfession());
+        response.setSmokingPreference(user.getSmokingPreference());
+        response.setPetPolicy(user.getPetPolicy());
+        response.setOccupation(user.getOccupation());
         response.setShortDescription(user.getShortDescription());
         response.setProfileComplete(userService.isProfileComplete(user));
 

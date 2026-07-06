@@ -166,7 +166,8 @@ public class CountryController {
 
     private CityResponse mapCityToResponse(City city, long listingCount) {
         boolean hasImage = city.getImage() != null && city.getImage().length > 0;
-        return new CityResponse(city.getId(), city.getNameEn(), city.getNameBg(), city.getCountry().getId(),
-                listingCount, hasImage);
+        Country country = city.getCountry();
+        return new CityResponse(city.getId(), city.getNameEn(), city.getNameBg(), country.getId(),
+                country.getNameEn(), country.getNameBg(), listingCount, hasImage);
     }
 }

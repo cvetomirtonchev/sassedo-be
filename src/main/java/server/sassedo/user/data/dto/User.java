@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import server.sassedo.listing.common.PetPolicy;
+import server.sassedo.listing.common.SmokerPreference;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -67,9 +69,19 @@ public class User {
     @Enumerated(EnumType.STRING)
     private JobStatus jobStatus;
 
-    private Boolean smoker;
+    @Size(max = 100)
+    private String profession;
 
-    private Boolean hasPets;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "smoking_preference")
+    private SmokerPreference smokingPreference;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pet_policy")
+    private PetPolicy petPolicy;
+
+    @Enumerated(EnumType.STRING)
+    private Occupation occupation;
 
     @Column(length = 1000)
     private String shortDescription;
