@@ -7,13 +7,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingStatus;
-import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.rental.data.dto.RentalListing;
 import server.sassedo.listing.rental.data.dto.RentalListingPhoto;
 import server.sassedo.listing.rental.data.network.request.RentalListingRequest;
 import server.sassedo.listing.rental.repository.RentalListingPhotoRepository;
 import server.sassedo.listing.rental.repository.RentalListingRepository;
+import server.sassedo.listing.rental.repository.RentalListingSpecifications;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
 import server.sassedo.location.repository.CityRepository;
@@ -76,8 +77,8 @@ public class RentalListingServiceImpl implements RentalListingService {
     }
 
     @Override
-    public Page<RentalListing> browse(Long cityId, PropertyType propertyType, Pageable pageable) {
-        return listingRepository.browse(ListingStatus.ACTIVE, cityId, propertyType, pageable);
+    public Page<RentalListing> browse(ListingFilter filter, Pageable pageable) {
+        return listingRepository.findAll(RentalListingSpecifications.browse(filter), pageable);
     }
 
     @Override

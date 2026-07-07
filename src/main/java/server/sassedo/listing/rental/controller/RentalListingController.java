@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -15,11 +16,14 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import server.sassedo.common.data.network.response.PageMeta;
 import server.sassedo.common.data.network.response.PagedResponse;
+import server.sassedo.listing.common.LeaseTerm;
+import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingSort;
 import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.rental.data.dto.RentalListing;
 import server.sassedo.listing.rental.data.dto.RentalListingPhoto;
+import server.sassedo.listing.common.ListingContactResponse;
 import server.sassedo.listing.rental.data.network.request.RentalListingRequest;
 import server.sassedo.listing.rental.data.network.response.RentalListingResponse;
 import server.sassedo.listing.rental.service.RentalListingService;
@@ -27,9 +31,14 @@ import server.sassedo.listing.roommate.data.network.request.UpdateListingStatusR
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
 import server.sassedo.model.GenericException;
 import server.sassedo.security.jwt.JwtUtils;
+import server.sassedo.user.data.dto.User;
+import server.sassedo.user.service.user.UserService;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static server.sassedo.utils.ServerUtils.getUserId;
@@ -41,6 +50,7 @@ import static server.sassedo.utils.ServerUtils.getUserId;
 public class RentalListingController {
 
     private final RentalListingService listingService;
+    private final UserService userService;
     private final JwtUtils jwtUtils;
 
     @PostMapping
@@ -58,10 +68,29 @@ public class RentalListingController {
     public ResponseEntity<?> browse(
             @RequestParam(required = false) Long cityId,
             @RequestParam(required = false) PropertyType propertyType,
+            @RequestParam(required = false) String neighborhood,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate availableBy,
+            @RequestParam(required = false) Integer minBedrooms,
+            @RequestParam(required = false) Integer minBathrooms,
+            @RequestParam(required = false) Set<LeaseTerm> leaseTerms,
+            @RequestParam(required = false) Set<String> amenities,
             @RequestParam(defaultValue = "NEWEST") ListingSort sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        Page<RentalListing> listings = listingService.browse(cityId, propertyType,
+        ListingFilter filter = new ListingFilter();
+        filter.setCityId(cityId);
+        filter.setPropertyType(propertyType);
+        filter.setNeighborhood(neighborhood);
+        filter.setMinPrice(minPrice);
+        filter.setMaxPrice(maxPrice);
+        filter.setAvailableBy(availableBy);
+        filter.setMinBedrooms(minBedrooms);
+        filter.setMinBathrooms(minBathrooms);
+        filter.setLeaseTerms(leaseTerms);
+        filter.setAmenities(amenities);
+        Page<RentalListing> listings = listingService.browse(filter,
                 PageRequest.of(page, size, sort.toSort("rent")));
         return ResponseEntity.ok(toPagedResponse(listings));
     }
@@ -79,7 +108,21 @@ public class RentalListingController {
         Long userId = getUserId(httpRequest, jwtUtils);
         try {
             RentalListing listing = listingService.getViewableById(id, userId, isAdmin());
-            return ResponseEntity.ok(mapToResponse(listing));
+            RentalListingResponse response = mapToResponse(listing);
+            enrichOwner(response, listing.getOwnerId());
+            return ResponseEntity.ok(response);
+        } catch (GenericException e) {
+            return ResponseEntity.status(404).body(e.getErrorResponse());
+        }
+    }
+
+    @GetMapping("/{id}/contact")
+    public ResponseEntity<?> getContact(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            RentalListing listing = listingService.getViewableById(id, userId, isAdmin());
+            User owner = userService.getUserById(listing.getOwnerId());
+            return ResponseEntity.ok(new ListingContactResponse(owner.getName(), owner.getPhone()));
         } catch (GenericException e) {
             return ResponseEntity.status(404).body(e.getErrorResponse());
         }
@@ -301,5 +344,25 @@ public class RentalListingController {
                 .path("/api/rental-listings/photos/")
                 .path(String.valueOf(photoId))
                 .toUriString();
+    }
+
+    private void enrichOwner(RentalListingResponse response, Long ownerId) {
+        if (ownerId == null) {
+            return;
+        }
+        try {
+            User owner = userService.getUserById(ownerId);
+            response.setOwnerName(owner.getName());
+            if (owner.getProfilePhoto() != null && owner.getProfilePhoto().length > 0) {
+                String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                        .path("/api/user/")
+                        .path(String.valueOf(ownerId))
+                        .path("/picture")
+                        .toUriString();
+                response.setOwnerPhotoUrl(photoUrl);
+            }
+        } catch (GenericException ignored) {
+            // owner missing; leave owner fields null
+        }
     }
 }

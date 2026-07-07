@@ -18,6 +18,8 @@ public class RentalListingResponse {
 
     private Long id;
     private Long ownerId;
+    private String ownerName;
+    private String ownerPhotoUrl;
     private ListingStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

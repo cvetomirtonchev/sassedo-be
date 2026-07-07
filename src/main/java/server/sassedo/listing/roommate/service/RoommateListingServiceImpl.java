@@ -7,13 +7,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingStatus;
-import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.dto.RoommateListingPhoto;
 import server.sassedo.listing.roommate.data.network.request.RoommateListingRequest;
 import server.sassedo.listing.roommate.repository.RoommateListingPhotoRepository;
 import server.sassedo.listing.roommate.repository.RoommateListingRepository;
+import server.sassedo.listing.roommate.repository.RoommateListingSpecifications;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
 import server.sassedo.location.repository.CityRepository;
@@ -76,8 +77,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     }
 
     @Override
-    public Page<RoommateListing> browse(Long cityId, PropertyType propertyType, Pageable pageable) {
-        return listingRepository.browse(ListingStatus.ACTIVE, cityId, propertyType, pageable);
+    public Page<RoommateListing> browse(ListingFilter filter, Pageable pageable) {
+        return listingRepository.findAll(RoommateListingSpecifications.browse(filter), pageable);
     }
 
     @Override

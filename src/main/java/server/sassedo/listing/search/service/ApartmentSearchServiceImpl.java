@@ -6,11 +6,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingStatus;
-import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.search.data.dto.ApartmentSearch;
 import server.sassedo.listing.search.data.network.request.ApartmentSearchRequest;
 import server.sassedo.listing.search.repository.ApartmentSearchRepository;
+import server.sassedo.listing.search.repository.ApartmentSearchSpecifications;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
 import server.sassedo.location.repository.CityRepository;
@@ -71,8 +72,8 @@ public class ApartmentSearchServiceImpl implements ApartmentSearchService {
     }
 
     @Override
-    public Page<ApartmentSearch> browse(Long cityId, PropertyType propertyType, Pageable pageable) {
-        return searchRepository.browse(ListingStatus.ACTIVE, cityId, propertyType, pageable);
+    public Page<ApartmentSearch> browse(ListingFilter filter, Pageable pageable) {
+        return searchRepository.findAll(ApartmentSearchSpecifications.browse(filter), pageable);
     }
 
     @Override

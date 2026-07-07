@@ -2,8 +2,8 @@ package server.sassedo.listing.search.service;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingStatus;
-import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.search.data.dto.ApartmentSearch;
 import server.sassedo.listing.search.data.network.request.ApartmentSearchRequest;
 import server.sassedo.model.GenericException;
@@ -20,7 +20,7 @@ public interface ApartmentSearchService {
 
     ApartmentSearch getViewableById(Long id, Long requesterId, boolean admin) throws GenericException;
 
-    Page<ApartmentSearch> browse(Long cityId, PropertyType propertyType, Pageable pageable);
+    Page<ApartmentSearch> browse(ListingFilter filter, Pageable pageable);
 
     Page<ApartmentSearch> adminSearch(ListingStatus status, String search, Pageable pageable);
 

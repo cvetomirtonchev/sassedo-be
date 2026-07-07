@@ -3,6 +3,7 @@ package server.sassedo.listing.search.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +16,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
-public interface ApartmentSearchRepository extends JpaRepository<ApartmentSearch, Long> {
+public interface ApartmentSearchRepository extends JpaRepository<ApartmentSearch, Long>,
+        JpaSpecificationExecutor<ApartmentSearch> {
 
     List<ApartmentSearch> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);
 

@@ -6,12 +6,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import server.sassedo.common.data.network.response.PageMeta;
 import server.sassedo.common.data.network.response.PagedResponse;
+import server.sassedo.listing.common.LeaseTerm;
+import server.sassedo.listing.common.ListingContactResponse;
+import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingSort;
 import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.PropertyType;
@@ -22,8 +27,13 @@ import server.sassedo.listing.search.data.network.response.ApartmentSearchRespon
 import server.sassedo.listing.search.service.ApartmentSearchService;
 import server.sassedo.model.GenericException;
 import server.sassedo.security.jwt.JwtUtils;
+import server.sassedo.user.data.dto.User;
+import server.sassedo.user.service.user.UserService;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static server.sassedo.utils.ServerUtils.getUserId;
@@ -35,6 +45,7 @@ import static server.sassedo.utils.ServerUtils.getUserId;
 public class ApartmentSearchController {
 
     private final ApartmentSearchService searchService;
+    private final UserService userService;
     private final JwtUtils jwtUtils;
 
     @PostMapping
@@ -52,10 +63,23 @@ public class ApartmentSearchController {
     public ResponseEntity<?> browse(
             @RequestParam(required = false) Long cityId,
             @RequestParam(required = false) PropertyType propertyType,
+            @RequestParam(required = false) String neighborhood,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate availableBy,
+            @RequestParam(required = false) Set<LeaseTerm> leaseTerms,
             @RequestParam(defaultValue = "NEWEST") ListingSort sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        Page<ApartmentSearch> results = searchService.browse(cityId, propertyType,
+        ListingFilter filter = new ListingFilter();
+        filter.setCityId(cityId);
+        filter.setPropertyType(propertyType);
+        filter.setNeighborhood(neighborhood);
+        filter.setMinPrice(minPrice);
+        filter.setMaxPrice(maxPrice);
+        filter.setAvailableBy(availableBy);
+        filter.setLeaseTerms(leaseTerms);
+        Page<ApartmentSearch> results = searchService.browse(filter,
                 PageRequest.of(page, size, sort.toSort("budgetMax")));
         return ResponseEntity.ok(toPagedResponse(results));
     }
@@ -73,7 +97,21 @@ public class ApartmentSearchController {
         Long userId = getUserId(httpRequest, jwtUtils);
         try {
             ApartmentSearch entity = searchService.getViewableById(id, userId, isAdmin());
-            return ResponseEntity.ok(mapToResponse(entity));
+            ApartmentSearchResponse response = mapToResponse(entity);
+            enrichOwner(response, entity.getOwnerId());
+            return ResponseEntity.ok(response);
+        } catch (GenericException e) {
+            return ResponseEntity.status(404).body(e.getErrorResponse());
+        }
+    }
+
+    @GetMapping("/{id}/contact")
+    public ResponseEntity<?> getContact(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            ApartmentSearch entity = searchService.getViewableById(id, userId, isAdmin());
+            User owner = userService.getUserById(entity.getOwnerId());
+            return ResponseEntity.ok(new ListingContactResponse(owner.getName(), owner.getPhone()));
         } catch (GenericException e) {
             return ResponseEntity.status(404).body(e.getErrorResponse());
         }
@@ -221,5 +259,25 @@ public class ApartmentSearchController {
             r.setPinned(entity.getPromotionState().isPinned());
         }
         return r;
+    }
+
+    private void enrichOwner(ApartmentSearchResponse response, Long ownerId) {
+        if (ownerId == null) {
+            return;
+        }
+        try {
+            User owner = userService.getUserById(ownerId);
+            response.setOwnerName(owner.getName());
+            if (owner.getProfilePhoto() != null && owner.getProfilePhoto().length > 0) {
+                String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                        .path("/api/user/")
+                        .path(String.valueOf(ownerId))
+                        .path("/picture")
+                        .toUriString();
+                response.setOwnerPhotoUrl(photoUrl);
+            }
+        } catch (GenericException ignored) {
+            // owner missing; leave owner fields null
+        }
     }
 }

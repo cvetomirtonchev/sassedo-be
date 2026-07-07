@@ -3,8 +3,8 @@ package server.sassedo.listing.roommate.service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
+import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingStatus;
-import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.dto.RoommateListingPhoto;
 import server.sassedo.listing.roommate.data.network.request.RoommateListingRequest;
@@ -23,7 +23,7 @@ public interface RoommateListingService {
 
     RoommateListing getViewableById(Long id, Long requesterId, boolean admin) throws GenericException;
 
-    Page<RoommateListing> browse(Long cityId, PropertyType propertyType, Pageable pageable);
+    Page<RoommateListing> browse(ListingFilter filter, Pageable pageable);
 
     Page<RoommateListing> adminSearch(ListingStatus status, String search, Pageable pageable);
 

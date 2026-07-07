@@ -3,8 +3,8 @@ package server.sassedo.listing.rental.service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
+import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingStatus;
-import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.rental.data.dto.RentalListing;
 import server.sassedo.listing.rental.data.dto.RentalListingPhoto;
 import server.sassedo.listing.rental.data.network.request.RentalListingRequest;
@@ -23,7 +23,7 @@ public interface RentalListingService {
 
     RentalListing getViewableById(Long id, Long requesterId, boolean admin) throws GenericException;
 
-    Page<RentalListing> browse(Long cityId, PropertyType propertyType, Pageable pageable);
+    Page<RentalListing> browse(ListingFilter filter, Pageable pageable);
 
     Page<RentalListing> adminSearch(ListingStatus status, String search, Pageable pageable);
 
