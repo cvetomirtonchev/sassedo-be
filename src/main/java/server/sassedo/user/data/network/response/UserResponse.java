@@ -2,7 +2,10 @@ package server.sassedo.user.data.network.response;
 
 import lombok.Getter;
 import lombok.Setter;
+import server.sassedo.listing.common.NearbyAmenity;
 import server.sassedo.listing.common.PetPolicy;
+import server.sassedo.listing.common.PropertyType;
+import server.sassedo.listing.common.RoomAmenity;
 import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.user.data.dto.ERole;
 import server.sassedo.user.data.dto.JobStatus;
@@ -10,6 +13,7 @@ import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
@@ -38,8 +42,6 @@ public class UserResponse {
 
     private String profilePhotoUrl;
 
-    private String city;
-
     private Integer age;
 
     private Sex sex;
@@ -57,6 +59,34 @@ public class UserResponse {
     private Occupation occupation;
 
     private String shortDescription;
+
+    private BigDecimal preferredMaxBudget;
+
+    private PropertyType preferredPropertyType;
+
+    private Boolean preferredFurnished;
+
+    private Boolean preferredPetsAllowed;
+
+    private Integer preferredMinBedrooms;
+
+    private Integer preferredMinBathrooms;
+
+    private Long preferredCountryId;
+
+    private String preferredCountryNameEn;
+
+    private String preferredCountryNameBg;
+
+    private Long preferredCityId;
+
+    private String preferredCityNameEn;
+
+    private String preferredCityNameBg;
+
+    private Set<RoomAmenity> preferredRoomAmenities;
+
+    private Set<NearbyAmenity> preferredNearbyAmenities;
 
     private boolean profileComplete;
 

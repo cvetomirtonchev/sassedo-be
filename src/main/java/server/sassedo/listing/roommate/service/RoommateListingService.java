@@ -25,6 +25,8 @@ public interface RoommateListingService {
 
     Page<RoommateListing> browse(ListingFilter filter, Pageable pageable);
 
+    List<RoommateListing> browseAllForMatch(ListingFilter filter);
+
     Page<RoommateListing> adminSearch(ListingStatus status, String search, Pageable pageable);
 
     List<RoommateListing> getMyListings(Long ownerId);

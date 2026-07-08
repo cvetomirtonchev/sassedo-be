@@ -27,6 +27,7 @@ import server.sassedo.listing.roommate.data.network.request.RoommateListingReque
 import server.sassedo.listing.roommate.data.network.request.UpdateListingStatusRequest;
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
 import server.sassedo.listing.roommate.data.network.response.RoommateListingResponse;
+import server.sassedo.listing.roommate.matching.RoommateMatchScorer;
 import server.sassedo.listing.roommate.service.RoommateListingService;
 import server.sassedo.model.GenericException;
 import server.sassedo.security.jwt.JwtUtils;
@@ -36,6 +37,7 @@ import server.sassedo.user.service.user.UserService;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -51,6 +53,7 @@ public class RoommateListingController {
     private final RoommateListingService listingService;
     private final UserService userService;
     private final JwtUtils jwtUtils;
+    private final RoommateMatchScorer matchScorer;
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody RoommateListingRequest request, HttpServletRequest httpRequest) {
@@ -74,9 +77,11 @@ public class RoommateListingController {
             @RequestParam(required = false) Integer minBedrooms,
             @RequestParam(required = false) Integer minBathrooms,
             @RequestParam(required = false) Set<String> amenities,
+            @RequestParam(required = false) Integer minMatchScore,
             @RequestParam(defaultValue = "NEWEST") ListingSort sort,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest httpRequest) {
         ListingFilter filter = new ListingFilter();
         filter.setCityId(cityId);
         filter.setPropertyType(propertyType);
@@ -87,9 +92,77 @@ public class RoommateListingController {
         filter.setMinBedrooms(minBedrooms);
         filter.setMinBathrooms(minBathrooms);
         filter.setAmenities(amenities);
+
+        User user = resolveUser(getUserId(httpRequest, jwtUtils));
+
+        // Match-based sort and the minimum-match filter both require scoring every candidate, so they
+        // are handled in memory across all matching listings (only meaningful for logged-in users).
+        if (user != null && (sort == ListingSort.BEST_MATCH || minMatchScore != null)) {
+            return ResponseEntity.ok(inMemoryMatchPage(filter, user, sort, minMatchScore, page, size));
+        }
+
         Page<RoommateListing> listings = listingService.browse(filter,
                 PageRequest.of(page, size, sort.toSort("rent")));
-        return ResponseEntity.ok(toPagedResponse(listings));
+        return ResponseEntity.ok(toPagedResponse(listings, user));
+    }
+
+    private PagedResponse<RoommateListingResponse> inMemoryMatchPage(ListingFilter filter, User user,
+            ListingSort sort, Integer minMatchScore, int page, int size) {
+        List<RoommateListingResponse> mapped = listingService.browseAllForMatch(filter).stream()
+                .map(listing -> mapToResponse(listing, user))
+                .collect(Collectors.toList());
+
+        if (minMatchScore != null) {
+            int threshold = minMatchScore;
+            mapped = mapped.stream()
+                    .filter(r -> r.getMatchScore() != null && r.getMatchScore() >= threshold)
+                    .collect(Collectors.toList());
+        }
+
+        Comparator<RoommateListingResponse> comparator = Comparator
+                .comparingInt(RoommateListingResponse::getPromotionPriority).reversed()
+                .thenComparing(matchOrListingComparator(sort));
+        List<RoommateListingResponse> ranked = mapped.stream()
+                .sorted(comparator)
+                .collect(Collectors.toList());
+
+        int total = ranked.size();
+        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 0;
+        int from = Math.min(page * size, total);
+        int to = Math.min(from + size, total);
+        List<RoommateListingResponse> content = ranked.subList(from, to);
+        return new PagedResponse<>(content, new PageMeta(page, totalPages, total));
+    }
+
+    private Comparator<RoommateListingResponse> matchOrListingComparator(ListingSort sort) {
+        Comparator<RoommateListingResponse> byCreatedDesc = Comparator.comparing(
+                RoommateListingResponse::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+        return switch (sort) {
+            case BEST_MATCH -> Comparator.comparing(
+                            (RoommateListingResponse r) -> r.getMatchScore() == null ? -1 : r.getMatchScore())
+                    .reversed()
+                    .thenComparing(byCreatedDesc);
+            case OLDEST -> Comparator.comparing(
+                    RoommateListingResponse::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
+            case PRICE_ASC -> Comparator.comparing(
+                    RoommateListingResponse::getRent, Comparator.nullsLast(Comparator.naturalOrder()));
+            case PRICE_DESC -> Comparator.comparing(
+                    RoommateListingResponse::getRent, Comparator.nullsLast(Comparator.reverseOrder()));
+            case RECENTLY_UPDATED -> Comparator.comparing(
+                    RoommateListingResponse::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+            case NEWEST -> byCreatedDesc;
+        };
+    }
+
+    private User resolveUser(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        try {
+            return userService.getUserById(userId);
+        } catch (GenericException e) {
+            return null;
+        }
     }
 
     @GetMapping("/mine")
@@ -105,7 +178,7 @@ public class RoommateListingController {
         Long userId = getUserId(httpRequest, jwtUtils);
         try {
             RoommateListing listing = listingService.getViewableById(id, userId, isAdmin());
-            RoommateListingResponse response = mapToResponse(listing);
+            RoommateListingResponse response = mapToResponse(listing, resolveUser(userId));
             enrichOwner(response, listing.getOwnerId());
             return ResponseEntity.ok(response);
         } catch (GenericException e) {
@@ -269,13 +342,21 @@ public class RoommateListingController {
     }
 
     private PagedResponse<RoommateListingResponse> toPagedResponse(Page<RoommateListing> listings) {
+        return toPagedResponse(listings, null);
+    }
+
+    private PagedResponse<RoommateListingResponse> toPagedResponse(Page<RoommateListing> listings, User user) {
         List<RoommateListingResponse> content = listings.getContent().stream()
-                .map(this::mapToResponse).collect(Collectors.toList());
+                .map(listing -> mapToResponse(listing, user)).collect(Collectors.toList());
         PageMeta meta = new PageMeta(listings.getNumber(), listings.getTotalPages(), listings.getTotalElements());
         return new PagedResponse<>(content, meta);
     }
 
     private RoommateListingResponse mapToResponse(RoommateListing listing) {
+        return mapToResponse(listing, null);
+    }
+
+    private RoommateListingResponse mapToResponse(RoommateListing listing, User user) {
         RoommateListingResponse r = new RoommateListingResponse();
         r.setId(listing.getId());
         r.setOwnerId(listing.getOwnerId());
@@ -346,6 +427,10 @@ public class RoommateListingController {
                 .ifPresent(main -> r.setMainPhotoUrl(main.getUrl()));
         if (r.getMainPhotoUrl() == null && !photos.isEmpty()) {
             r.setMainPhotoUrl(photos.get(0).getUrl());
+        }
+
+        if (user != null) {
+            r.setMatchScore(matchScorer.score(user, listing));
         }
         return r;
     }

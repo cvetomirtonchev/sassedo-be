@@ -4,7 +4,7 @@
 --   * a unique email: seeduser1@sassedo.test ... seeduser100@sassedo.test
 --   * a shared BCrypt password hash for the plaintext password "Password123!"
 --     (Spring Security's BCryptPasswordEncoder accepts the $2y$ variant)
---   * a full profile (name, phone, city, age, sex, job status, smoking preference, pet policy, occupation, description)
+--   * a full profile (name, phone, age, sex, job status, smoking preference, pet policy, occupation, description)
 --   * enabled = 1, blocked = 0, all consent flags accepted
 --   * the ROLE_USER role (looked up by name, not a hard-coded id)
 --   * two languages (ENGLISH + a rotated second language)
@@ -89,13 +89,13 @@ BEGIN
                 'BULGARIAN', 'GERMAN', 'SPANISH', 'FRENCH', 'ITALIAN');
 
             INSERT INTO users (
-                email, password, name, first_name, last_name, phone, city, age,
+                email, password, name, first_name, last_name, phone, age,
                 sex, job_status, smoking_preference, pet_policy, occupation, short_description, enabled, blocked,
                 is_terms_and_conditions_accepted, is_gdpr_accepted,
                 terms_and_conditions_accepted_at, gdpr_accepted_at,
                 is_marketing_consent_accepted, marketing_consent_accepted_at
             ) VALUES (
-                vEmail, vPassword, vName, vFirstName, vLastName, vPhone, vCity, vAge,
+                vEmail, vPassword, vName, vFirstName, vLastName, vPhone, vAge,
                 vSex, vJobStatus, vSmokingPreference, vPetPolicy, vOccupation, vShortDescription, 1, 0,
                 1, 1,
                 NOW(), NOW(),

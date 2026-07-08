@@ -66,4 +66,6 @@ public class RentalListingResponse {
     private int promotionPriority;
     private LocalDateTime promotedUntil;
     private boolean pinned;
+
+    private Integer matchScore;
 }

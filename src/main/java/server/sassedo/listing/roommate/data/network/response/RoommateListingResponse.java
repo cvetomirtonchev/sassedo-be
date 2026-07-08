@@ -78,4 +78,8 @@ public class RoommateListingResponse {
     private int promotionPriority;
     private LocalDateTime promotedUntil;
     private boolean pinned;
+
+    // Compatibility (0-100) between the requesting user's profile and this listing's roommate
+    // requirements. Only populated for authenticated requests; null otherwise.
+    private Integer matchScore;
 }

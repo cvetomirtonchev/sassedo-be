@@ -8,12 +8,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import server.sassedo.location.data.dto.City;
+import server.sassedo.location.data.dto.Country;
+import server.sassedo.location.repository.CityRepository;
+import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
 import server.sassedo.user.data.dto.ERole;
 import server.sassedo.user.data.dto.PasswordResetToken;
 import server.sassedo.user.data.dto.Role;
 import server.sassedo.user.data.dto.User;
+import server.sassedo.user.data.dto.UserPreferencesDto;
 import server.sassedo.user.data.network.UpdateUserRequest;
 import server.sassedo.user.data.network.request.*;
 import server.sassedo.user.repository.PasswordTokenRepository;
@@ -37,6 +42,8 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder encoder;
     private final PasswordTokenRepository passwordTokenRepository;
     private final EmailVerificationService emailVerificationService;
+    private final CountryRepository countryRepository;
+    private final CityRepository cityRepository;
 
     @Override
     @Transactional
@@ -232,9 +239,6 @@ public class UserServiceImpl implements UserService {
         if (request.getVerified() != null) {
             user.setEnabled(request.getVerified());
         }
-        if (request.getCity() != null) {
-            user.setCity(request.getCity());
-        }
         if (request.getAge() != null) {
             user.setAge(request.getAge());
         }
@@ -330,9 +334,6 @@ public class UserServiceImpl implements UserService {
         if (request.getPhone() != null) {
             user.setPhone(request.getPhone());
         }
-        if (request.getCity() != null) {
-            user.setCity(request.getCity());
-        }
         if (request.getAge() != null) {
             user.setAge(request.getAge());
         }
@@ -359,6 +360,46 @@ public class UserServiceImpl implements UserService {
         }
         if (request.getShortDescription() != null) {
             user.setShortDescription(request.getShortDescription());
+        }
+
+        UserPreferencesDto preferences = user.getPreferences();
+        if (preferences == null) {
+            preferences = new UserPreferencesDto();
+            user.setPreferences(preferences);
+        }
+        if (request.getPreferredMaxBudget() != null) {
+            preferences.setPreferredMaxBudget(request.getPreferredMaxBudget());
+        }
+        if (request.getPreferredPropertyType() != null) {
+            preferences.setPreferredPropertyType(request.getPreferredPropertyType());
+        }
+        if (request.getPreferredFurnished() != null) {
+            preferences.setPreferredFurnished(request.getPreferredFurnished());
+        }
+        if (request.getPreferredPetsAllowed() != null) {
+            preferences.setPreferredPetsAllowed(request.getPreferredPetsAllowed());
+        }
+        if (request.getPreferredMinBedrooms() != null) {
+            preferences.setPreferredMinBedrooms(request.getPreferredMinBedrooms());
+        }
+        if (request.getPreferredMinBathrooms() != null) {
+            preferences.setPreferredMinBathrooms(request.getPreferredMinBathrooms());
+        }
+        if (request.getPreferredCountryId() != null) {
+            Country country = countryRepository.findById(request.getPreferredCountryId())
+                    .orElseThrow(() -> new GenericException(GenericExceptionCode.COUNTRY_NOT_FOUND, "Country not found"));
+            preferences.setPreferredCountry(country);
+        }
+        if (request.getPreferredCityId() != null) {
+            City city = cityRepository.findById(request.getPreferredCityId())
+                    .orElseThrow(() -> new GenericException(GenericExceptionCode.CITY_NOT_FOUND, "City not found"));
+            preferences.setPreferredCity(city);
+        }
+        if (request.getPreferredRoomAmenities() != null) {
+            preferences.setPreferredRoomAmenities(new LinkedHashSet<>(request.getPreferredRoomAmenities()));
+        }
+        if (request.getPreferredNearbyAmenities() != null) {
+            preferences.setPreferredNearbyAmenities(new LinkedHashSet<>(request.getPreferredNearbyAmenities()));
         }
 
         return userRepository.save(user);
@@ -389,7 +430,6 @@ public class UserServiceImpl implements UserService {
                 && hasText(user.getFirstName())
                 && hasText(user.getLastName())
                 && hasText(user.getPhone())
-                && hasText(user.getCity())
                 && user.getAge() != null
                 && user.getSex() != null
                 && user.getLanguages() != null && !user.getLanguages().isEmpty()

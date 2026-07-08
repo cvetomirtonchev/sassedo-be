@@ -52,9 +52,6 @@ public class User {
     @Column(columnDefinition = "MEDIUMBLOB")
     private byte[] profilePhoto;
 
-    @Size(max = 100)
-    private String city;
-
     private Integer age;
 
     @Enumerated(EnumType.STRING)
@@ -85,6 +82,11 @@ public class User {
 
     @Column(length = 1000)
     private String shortDescription;
+
+    // Optional roommate/property preferences. Grouped into an embeddable; all optional and do not
+    // affect profile completeness. Initialized so reads/writes never NPE.
+    @Embedded
+    private UserPreferencesDto preferences = new UserPreferencesDto();
 
     @Size(max = 64)
     private String verificationCode;

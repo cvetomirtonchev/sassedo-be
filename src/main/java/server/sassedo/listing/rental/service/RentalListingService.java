@@ -25,6 +25,8 @@ public interface RentalListingService {
 
     Page<RentalListing> browse(ListingFilter filter, Pageable pageable);
 
+    List<RentalListing> browseAllForMatch(ListingFilter filter);
+
     Page<RentalListing> adminSearch(ListingStatus status, String search, Pageable pageable);
 
     List<RentalListing> getMyListings(Long ownerId);

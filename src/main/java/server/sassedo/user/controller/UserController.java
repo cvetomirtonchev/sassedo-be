@@ -18,6 +18,7 @@ import server.sassedo.security.jwt.JwtUtils;
 import server.sassedo.user.data.UserDetailsImpl;
 import server.sassedo.user.data.dto.Role;
 import server.sassedo.user.data.dto.User;
+import server.sassedo.user.data.dto.UserPreferencesDto;
 import server.sassedo.user.data.network.UpdateUserRequest;
 import server.sassedo.user.data.network.request.AdminBlockUserRequest;
 import server.sassedo.user.data.network.request.AdminUpdateUserRequest;
@@ -230,7 +231,6 @@ public class UserController {
         response.setFirstName(user.getFirstName());
         response.setLastName(user.getLastName());
         response.setPhone(user.getPhone());
-        response.setCity(user.getCity());
         response.setAge(user.getAge());
         response.setSex(user.getSex());
         response.setLanguages(user.getLanguages());
@@ -240,6 +240,28 @@ public class UserController {
         response.setPetPolicy(user.getPetPolicy());
         response.setOccupation(user.getOccupation());
         response.setShortDescription(user.getShortDescription());
+
+        UserPreferencesDto preferences = user.getPreferences();
+        if (preferences != null) {
+            response.setPreferredMaxBudget(preferences.getPreferredMaxBudget());
+            response.setPreferredPropertyType(preferences.getPreferredPropertyType());
+            response.setPreferredFurnished(preferences.getPreferredFurnished());
+            response.setPreferredPetsAllowed(preferences.getPreferredPetsAllowed());
+            response.setPreferredMinBedrooms(preferences.getPreferredMinBedrooms());
+            response.setPreferredMinBathrooms(preferences.getPreferredMinBathrooms());
+            response.setPreferredRoomAmenities(preferences.getPreferredRoomAmenities());
+            response.setPreferredNearbyAmenities(preferences.getPreferredNearbyAmenities());
+            if (preferences.getPreferredCountry() != null) {
+                response.setPreferredCountryId(preferences.getPreferredCountry().getId());
+                response.setPreferredCountryNameEn(preferences.getPreferredCountry().getNameEn());
+                response.setPreferredCountryNameBg(preferences.getPreferredCountry().getNameBg());
+            }
+            if (preferences.getPreferredCity() != null) {
+                response.setPreferredCityId(preferences.getPreferredCity().getId());
+                response.setPreferredCityNameEn(preferences.getPreferredCity().getNameEn());
+                response.setPreferredCityNameBg(preferences.getPreferredCity().getNameBg());
+            }
+        }
         response.setProfileComplete(userService.isProfileComplete(user));
 
         if (user.getProfilePhoto() != null && user.getProfilePhoto().length > 0) {

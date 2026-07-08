@@ -3,6 +3,7 @@ package server.sassedo.listing.rental.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class RentalListingServiceImpl implements RentalListingService {
+
+    private static final int MATCH_BROWSE_CAP = 1000;
 
     private final RentalListingRepository listingRepository;
     private final RentalListingPhotoRepository photoRepository;
@@ -79,6 +82,14 @@ public class RentalListingServiceImpl implements RentalListingService {
     @Override
     public Page<RentalListing> browse(ListingFilter filter, Pageable pageable) {
         return listingRepository.findAll(RentalListingSpecifications.browse(filter), pageable);
+    }
+
+    @Override
+    public List<RentalListing> browseAllForMatch(ListingFilter filter) {
+        // Match ranking is computed in-memory, so we load all filtered ACTIVE listings up to a
+        // sensible cap. Fine for the expected catalog size; revisit if it grows very large.
+        return listingRepository.findAll(RentalListingSpecifications.browse(filter),
+                PageRequest.of(0, MATCH_BROWSE_CAP)).getContent();
     }
 
     @Override

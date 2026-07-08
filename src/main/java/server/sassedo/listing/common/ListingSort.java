@@ -12,7 +12,8 @@ public enum ListingSort {
     OLDEST,
     PRICE_ASC,
     PRICE_DESC,
-    RECENTLY_UPDATED;
+    RECENTLY_UPDATED,
+    BEST_MATCH;
 
     /**
      * Builds the full sort: promotion tier first, then the user-selected key.
@@ -29,7 +30,9 @@ public enum ListingSort {
             case PRICE_ASC -> Sort.by(Sort.Order.asc(priceField).nullsLast());
             case PRICE_DESC -> Sort.by(Sort.Order.desc(priceField).nullsLast());
             case RECENTLY_UPDATED -> Sort.by(Sort.Order.desc("updatedAt"));
-            case NEWEST -> Sort.by(Sort.Order.desc("createdAt"));
+            // BEST_MATCH falls back to newest ordering at the DB level; the real match ranking is
+            // applied in-memory by the controller/service after scoring against the user profile.
+            case NEWEST, BEST_MATCH -> Sort.by(Sort.Order.desc("createdAt"));
         };
         return base.and(user);
     }

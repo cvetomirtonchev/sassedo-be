@@ -34,9 +34,6 @@ public class AdminUpdateUserRequest {
 
     private Boolean verified;
 
-    @Size(max = 100)
-    private String city;
-
     @Min(16)
     @Max(120)
     private Integer age;

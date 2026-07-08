@@ -6,13 +6,17 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import server.sassedo.listing.common.NearbyAmenity;
 import server.sassedo.listing.common.PetPolicy;
+import server.sassedo.listing.common.PropertyType;
+import server.sassedo.listing.common.RoomAmenity;
 import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 
+import java.math.BigDecimal;
 import java.util.Set;
 
 @Getter
@@ -28,9 +32,6 @@ public class UpdateProfileRequest {
     @Size(max = 30)
     @Pattern(regexp = "^\\+[1-9]\\d{6,14}$", message = "Phone must be a valid international number")
     private String phone;
-
-    @Size(max = 100)
-    private String city;
 
     @Min(16)
     @Max(120)
@@ -53,4 +54,29 @@ public class UpdateProfileRequest {
 
     @Size(max = 1000)
     private String shortDescription;
+
+    @Min(0)
+    private BigDecimal preferredMaxBudget;
+
+    private PropertyType preferredPropertyType;
+
+    private Boolean preferredFurnished;
+
+    private Boolean preferredPetsAllowed;
+
+    @Min(0)
+    @Max(50)
+    private Integer preferredMinBedrooms;
+
+    @Min(0)
+    @Max(50)
+    private Integer preferredMinBathrooms;
+
+    private Long preferredCountryId;
+
+    private Long preferredCityId;
+
+    private Set<RoomAmenity> preferredRoomAmenities;
+
+    private Set<NearbyAmenity> preferredNearbyAmenities;
 }
