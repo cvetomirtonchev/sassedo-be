@@ -16,6 +16,12 @@ import java.util.Set;
 @Setter
 public class RoommateListingRequest {
 
+    // Whether the lister has a property (true) or is looking for a place to share (false).
+    private Boolean hasProperty;
+
+    // Monthly budget for listers without a property.
+    private BigDecimal budget;
+
     // Step 1
     private PropertyType propertyType;
 

@@ -263,6 +263,7 @@ public class UserController {
             }
         }
         response.setProfileComplete(userService.isProfileComplete(user));
+        response.setPreferencesComplete(preferences != null && preferences.isCoreComplete());
 
         if (user.getProfilePhoto() != null && user.getProfilePhoto().length > 0) {
             String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()

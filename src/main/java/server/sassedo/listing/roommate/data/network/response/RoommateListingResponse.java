@@ -27,6 +27,9 @@ public class RoommateListingResponse {
     private LocalDateTime updatedAt;
     private LocalDateTime expiresAt;
 
+    private Boolean hasProperty;
+    private BigDecimal budget;
+
     private PropertyType propertyType;
 
     private Long countryId;

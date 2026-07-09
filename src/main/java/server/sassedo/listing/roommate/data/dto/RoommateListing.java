@@ -49,6 +49,16 @@ public class RoommateListing {
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
+    // Whether the lister has a property (looking for a roommate) or is only looking for a place to
+    // share. Nullable for backward compatibility with rows created before this field existed; a null
+    // value is treated as "has property" (true) everywhere it is read.
+    @Column(name = "has_property")
+    private Boolean hasProperty = true;
+
+    // Monthly budget for listers without a property (searching for a place to share).
+    @Column(name = "budget")
+    private BigDecimal budget;
+
     // Step 1: property type
     @Enumerated(EnumType.STRING)
     private PropertyType propertyType;

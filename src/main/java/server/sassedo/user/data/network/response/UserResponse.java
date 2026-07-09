@@ -90,6 +90,8 @@ public class UserResponse {
 
     private boolean profileComplete;
 
+    private boolean preferencesComplete;
+
     public UserResponse(Long id, String email, String name, boolean isVerified, List<ERole> roles, boolean isMarketingConsentAccepted) {
         this.id = id;
         this.email = email;

@@ -225,6 +225,16 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     }
 
     private void applyRequest(RoommateListing listing, RoommateListingRequest request) throws GenericException {
+        // Default to "has property" when the client omits the flag (backward compatibility).
+        boolean hasProperty = request.getHasProperty() == null || request.getHasProperty();
+        listing.setHasProperty(hasProperty);
+
+        if (!hasProperty) {
+            applyWithoutProperty(listing, request);
+            return;
+        }
+
+        listing.setBudget(null);
         listing.setPropertyType(request.getPropertyType());
 
         if (request.getCountryId() != null) {
@@ -272,6 +282,67 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         if (request.getRoomAmenities() != null) {
             listing.getRoomAmenities().addAll(request.getRoomAmenities());
         }
+
+        listing.setPreferredSex(request.getPreferredSex());
+        listing.setPreferredOrientation(request.getPreferredOrientation());
+        listing.setAgeMin(request.getAgeMin());
+        listing.setAgeMax(request.getAgeMax());
+        listing.setSmokingPreference(request.getSmokingPreference());
+        listing.setOccupationPreference(request.getOccupationPreference());
+        listing.setAdditionalRequirements(request.getAdditionalRequirements());
+        listing.setPetPolicy(request.getPetPolicy());
+        listing.setPeopleInProperty(request.getPeopleInProperty());
+        listing.getSpokenLanguages().clear();
+        if (request.getSpokenLanguages() != null) {
+            listing.getSpokenLanguages().addAll(request.getSpokenLanguages());
+        }
+        listing.setEmploymentStatus(request.getEmploymentStatus());
+        listing.setAboutMe(request.getAboutMe());
+
+        listing.setTitle(request.getTitle());
+        listing.setDescription(request.getDescription());
+    }
+
+    // Applies a request for a lister without a property: keeps location, budget, roommate
+    // requirements and title/description, but clears all property-specific fields so no stale
+    // property data lingers on the listing.
+    private void applyWithoutProperty(RoommateListing listing, RoommateListingRequest request) throws GenericException {
+        listing.setBudget(request.getBudget());
+        listing.setPropertyType(null);
+
+        if (request.getCountryId() != null) {
+            Country country = countryRepository.findById(request.getCountryId())
+                    .orElseThrow(() -> new GenericException(GenericExceptionCode.COUNTRY_NOT_FOUND, "Country not found"));
+            listing.setCountry(country);
+        } else {
+            listing.setCountry(null);
+        }
+        if (request.getCityId() != null) {
+            City city = cityRepository.findById(request.getCityId())
+                    .orElseThrow(() -> new GenericException(GenericExceptionCode.CITY_NOT_FOUND, "City not found"));
+            listing.setCity(city);
+        } else {
+            listing.setCity(null);
+        }
+        listing.setNeighborhood(request.getNeighborhood());
+        listing.setAddress(request.getAddress());
+
+        listing.setRent(null);
+        listing.setCostsIncluded(null);
+        listing.setDeposit(null);
+        listing.setRoomsCount(null);
+        listing.setFurnished(null);
+        listing.setPetsAllowed(null);
+        listing.setAvailableFrom(request.isAvailableAsap() ? null : request.getAvailableFrom());
+        listing.setAvailableAsap(request.isAvailableAsap());
+        listing.setBedrooms(null);
+        listing.setBathrooms(null);
+        listing.setOwner(null);
+
+        listing.getIncludedUtilities().clear();
+        listing.getExtraServices().clear();
+        listing.getNearbyAmenities().clear();
+        listing.getRoomAmenities().clear();
 
         listing.setPreferredSex(request.getPreferredSex());
         listing.setPreferredOrientation(request.getPreferredOrientation());

@@ -35,6 +35,18 @@ public final class RoommateListingSpecifications {
             if (f.getCityId() != null) {
                 predicates.add(cb.equal(root.get("city").get("id"), f.getCityId()));
             }
+            // Filter by has-property mode. A null column value predates this feature and is treated
+            // as "has property" (true).
+            boolean withoutProperty = Boolean.FALSE.equals(f.getHasProperty());
+            if (f.getHasProperty() != null) {
+                if (withoutProperty) {
+                    predicates.add(cb.equal(root.get("hasProperty"), Boolean.FALSE));
+                } else {
+                    predicates.add(cb.or(
+                            cb.equal(root.get("hasProperty"), Boolean.TRUE),
+                            cb.isNull(root.get("hasProperty"))));
+                }
+            }
             if (f.getPropertyType() != null) {
                 predicates.add(cb.equal(root.get("propertyType"), f.getPropertyType()));
             }
@@ -42,11 +54,13 @@ public final class RoommateListingSpecifications {
                 predicates.add(cb.like(cb.lower(root.get("neighborhood")),
                         "%" + f.getNeighborhood().toLowerCase() + "%"));
             }
+            // For listers without a property the price filter targets their budget; otherwise rent.
+            String priceField = withoutProperty ? "budget" : "rent";
             if (f.getMinPrice() != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("rent"), f.getMinPrice()));
+                predicates.add(cb.greaterThanOrEqualTo(root.get(priceField), f.getMinPrice()));
             }
             if (f.getMaxPrice() != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("rent"), f.getMaxPrice()));
+                predicates.add(cb.lessThanOrEqualTo(root.get(priceField), f.getMaxPrice()));
             }
             if (f.getAvailableBy() != null) {
                 Predicate asap = cb.isTrue(root.get("availableAsap"));

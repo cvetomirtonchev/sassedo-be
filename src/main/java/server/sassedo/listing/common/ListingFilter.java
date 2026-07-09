@@ -18,6 +18,8 @@ import java.util.Set;
 public class ListingFilter {
 
     private Long cityId;
+    // Roommate browse only: filter by whether the listing has a property. Null means no filter.
+    private Boolean hasProperty;
     private PropertyType propertyType;
     private String neighborhood;
     private BigDecimal minPrice;

@@ -61,4 +61,12 @@ public class UserPreferencesDto {
     @CollectionTable(name = "user_preferred_nearby_amenities", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "amenity")
     private Set<NearbyAmenity> preferredNearbyAmenities = new LinkedHashSet<>();
+
+    /**
+     * Whether the core preference set (budget, property type and city) is filled. This is the
+     * threshold that unlocks preference-based match scoring.
+     */
+    public boolean isCoreComplete() {
+        return preferredMaxBudget != null && preferredPropertyType != null && preferredCity != null;
+    }
 }

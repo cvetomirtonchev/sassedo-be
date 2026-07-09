@@ -69,6 +69,7 @@ public class RoommateListingController {
     @GetMapping
     public ResponseEntity<?> browse(
             @RequestParam(required = false) Long cityId,
+            @RequestParam(required = false) Boolean hasProperty,
             @RequestParam(required = false) PropertyType propertyType,
             @RequestParam(required = false) String neighborhood,
             @RequestParam(required = false) BigDecimal minPrice,
@@ -84,6 +85,7 @@ public class RoommateListingController {
             HttpServletRequest httpRequest) {
         ListingFilter filter = new ListingFilter();
         filter.setCityId(cityId);
+        filter.setHasProperty(hasProperty);
         filter.setPropertyType(propertyType);
         filter.setNeighborhood(neighborhood);
         filter.setMinPrice(minPrice);
@@ -131,6 +133,7 @@ public class RoommateListingController {
         int from = Math.min(page * size, total);
         int to = Math.min(from + size, total);
         List<RoommateListingResponse> content = ranked.subList(from, to);
+        content.forEach(r -> enrichOwner(r, r.getOwnerId()));
         return new PagedResponse<>(content, new PageMeta(page, totalPages, total));
     }
 
@@ -348,6 +351,7 @@ public class RoommateListingController {
     private PagedResponse<RoommateListingResponse> toPagedResponse(Page<RoommateListing> listings, User user) {
         List<RoommateListingResponse> content = listings.getContent().stream()
                 .map(listing -> mapToResponse(listing, user)).collect(Collectors.toList());
+        content.forEach(r -> enrichOwner(r, r.getOwnerId()));
         PageMeta meta = new PageMeta(listings.getNumber(), listings.getTotalPages(), listings.getTotalElements());
         return new PagedResponse<>(content, meta);
     }
@@ -364,6 +368,9 @@ public class RoommateListingController {
         r.setCreatedAt(listing.getCreatedAt());
         r.setUpdatedAt(listing.getUpdatedAt());
         r.setExpiresAt(listing.getExpiresAt());
+        // Treat a null column (rows predating this feature) as "has property".
+        r.setHasProperty(listing.getHasProperty() == null || listing.getHasProperty());
+        r.setBudget(listing.getBudget());
         r.setPropertyType(listing.getPropertyType());
 
         if (listing.getCountry() != null) {

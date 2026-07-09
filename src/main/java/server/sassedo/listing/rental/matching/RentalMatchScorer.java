@@ -13,9 +13,9 @@ import server.sassedo.user.data.dto.UserPreferencesDto;
  * {@code petPolicy}), min bedrooms, min bathrooms, nearby amenities and location. Furnished and
  * room-amenity preferences do not apply to rentals.
  *
- * <p>Returns {@code null} when the user has no preferences set (so no match badge is shown until at
- * least one preference exists) or when a preference exists but nothing on the listing is scorable;
- * otherwise the weighted average over applicable dimensions scaled to 0-100.
+ * <p>Returns {@code null} until the core preference set (budget, property type, city) is complete
+ * (so no match badge is shown until preferences are filled in), or when nothing on the listing is
+ * scorable; otherwise the weighted average over applicable dimensions scaled to 0-100.
  */
 @Component
 public class RentalMatchScorer {
@@ -33,7 +33,7 @@ public class RentalMatchScorer {
             return null;
         }
         UserPreferencesDto prefs = user.getPreferences();
-        if (prefs == null) {
+        if (prefs == null || !prefs.isCoreComplete()) {
             return null;
         }
 
