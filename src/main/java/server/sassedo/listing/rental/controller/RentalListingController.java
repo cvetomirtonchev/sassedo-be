@@ -13,9 +13,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import server.sassedo.common.data.network.response.PageMeta;
 import server.sassedo.common.data.network.response.PagedResponse;
+import server.sassedo.engagement.service.EngagementEnricher;
+import server.sassedo.engagement.service.ListingViewService;
 import server.sassedo.listing.common.LeaseTerm;
 import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingSort;
@@ -26,11 +27,10 @@ import server.sassedo.listing.rental.data.dto.RentalListingPhoto;
 import server.sassedo.listing.common.ListingContactResponse;
 import server.sassedo.listing.rental.data.network.request.RentalListingRequest;
 import server.sassedo.listing.rental.data.network.response.RentalListingResponse;
-import server.sassedo.listing.rental.matching.RentalMatchScorer;
 import server.sassedo.listing.rental.service.RentalListingService;
 import server.sassedo.listing.roommate.data.network.request.UpdateListingStatusRequest;
-import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
 import server.sassedo.model.GenericException;
+import server.sassedo.promotion.common.ListingType;
 import server.sassedo.security.jwt.JwtUtils;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.service.user.UserService;
@@ -54,7 +54,9 @@ public class RentalListingController {
     private final RentalListingService listingService;
     private final UserService userService;
     private final JwtUtils jwtUtils;
-    private final RentalMatchScorer matchScorer;
+    private final RentalListingMapper mapper;
+    private final EngagementEnricher engagementEnricher;
+    private final ListingViewService listingViewService;
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody RentalListingRequest request, HttpServletRequest httpRequest) {
@@ -122,9 +124,12 @@ public class RentalListingController {
                     .collect(Collectors.toList());
         }
 
+        // When the Match filter is active, always rank by match percentage (highest first),
+        // regardless of the selected sort control.
+        ListingSort effectiveSort = minMatchScore != null ? ListingSort.BEST_MATCH : sort;
         Comparator<RentalListingResponse> comparator = Comparator
                 .comparingInt(RentalListingResponse::getPromotionPriority).reversed()
-                .thenComparing(matchOrListingComparator(sort));
+                .thenComparing(matchOrListingComparator(effectiveSort));
         List<RentalListingResponse> ranked = mapped.stream()
                 .sorted(comparator)
                 .collect(Collectors.toList());
@@ -134,6 +139,7 @@ public class RentalListingController {
         int from = Math.min(page * size, total);
         int to = Math.min(from + size, total);
         List<RentalListingResponse> content = ranked.subList(from, to);
+        engagementEnricher.enrich(ListingType.RENTAL, content, user.getId(), false);
         return new PagedResponse<>(content, new PageMeta(page, totalPages, total));
     }
 
@@ -173,6 +179,7 @@ public class RentalListingController {
         Long userId = getUserId(httpRequest, jwtUtils);
         List<RentalListingResponse> content = listingService.getMyListings(userId).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
+        engagementEnricher.enrich(ListingType.RENTAL, content, userId, false);
         return ResponseEntity.ok(content);
     }
 
@@ -183,6 +190,9 @@ public class RentalListingController {
             RentalListing listing = listingService.getViewableById(id, userId, isAdmin());
             RentalListingResponse response = mapToResponse(listing, resolveUser(userId));
             enrichOwner(response, listing.getOwnerId());
+            String visitorId = httpRequest.getHeader("X-Visitor-Id");
+            listingViewService.recordView(ListingType.RENTAL, id, userId, visitorId, listing.getOwnerId());
+            engagementEnricher.enrich(ListingType.RENTAL, response, userId, true);
             return ResponseEntity.ok(response);
         } catch (GenericException e) {
             return ResponseEntity.status(404).body(e.getErrorResponse());
@@ -349,105 +359,20 @@ public class RentalListingController {
     private PagedResponse<RentalListingResponse> toPagedResponse(Page<RentalListing> listings, User user) {
         List<RentalListingResponse> content = listings.getContent().stream()
                 .map(listing -> mapToResponse(listing, user)).collect(Collectors.toList());
+        engagementEnricher.enrich(ListingType.RENTAL, content, user != null ? user.getId() : null, false);
         PageMeta meta = new PageMeta(listings.getNumber(), listings.getTotalPages(), listings.getTotalElements());
         return new PagedResponse<>(content, meta);
     }
 
     private RentalListingResponse mapToResponse(RentalListing listing) {
-        return mapToResponse(listing, null);
+        return mapper.map(listing);
     }
 
     private RentalListingResponse mapToResponse(RentalListing listing, User user) {
-        RentalListingResponse r = new RentalListingResponse();
-        r.setId(listing.getId());
-        r.setOwnerId(listing.getOwnerId());
-        r.setStatus(listing.getStatus());
-        r.setCreatedAt(listing.getCreatedAt());
-        r.setUpdatedAt(listing.getUpdatedAt());
-        r.setExpiresAt(listing.getExpiresAt());
-        r.setPropertyType(listing.getPropertyType());
-
-        if (listing.getCountry() != null) {
-            r.setCountryId(listing.getCountry().getId());
-            r.setCountryNameEn(listing.getCountry().getNameEn());
-            r.setCountryNameBg(listing.getCountry().getNameBg());
-        }
-        if (listing.getCity() != null) {
-            r.setCityId(listing.getCity().getId());
-            r.setCityNameEn(listing.getCity().getNameEn());
-            r.setCityNameBg(listing.getCity().getNameBg());
-        }
-        r.setNeighborhood(listing.getNeighborhood());
-        r.setAddress(listing.getAddress());
-
-        r.setRent(listing.getRent());
-        r.setAvailableFrom(listing.getAvailableFrom());
-        r.setAvailableAsap(listing.isAvailableAsap());
-        r.setBedrooms(listing.getBedrooms());
-        r.setBathrooms(listing.getBathrooms());
-        r.setSharedBedroom(listing.getSharedBedroom());
-        r.setSharedBathroom(listing.getSharedBathroom());
-        r.setOwner(listing.getOwner());
-        r.setPetPolicy(listing.getPetPolicy());
-        r.setSmokingPolicy(listing.getSmokingPolicy());
-
-        r.setIncludedUtilities(listing.getIncludedUtilities());
-        r.setExtraServices(listing.getExtraServices());
-        r.setLeaseTerms(listing.getLeaseTerms());
-        r.setNearbyAmenities(listing.getNearbyAmenities());
-        r.setPropertyAmenities(listing.getPropertyAmenities());
-
-        r.setAdditionalDetails(listing.getAdditionalDetails());
-        r.setTitle(listing.getTitle());
-        r.setDescription(listing.getDescription());
-
-        if (listing.getPromotionState() != null) {
-            r.setPromotionType(listing.getPromotionState().getPromotionType());
-            r.setPromotionPriority(listing.getPromotionState().getPromotionPriority());
-            r.setPromotedUntil(listing.getPromotionState().getPromotedUntil());
-            r.setPinned(listing.getPromotionState().isPinned());
-        }
-
-        List<ListingPhotoResponse> photos = listing.getPhotos().stream()
-                .map(p -> new ListingPhotoResponse(p.getId(), buildPhotoUrl(p.getId()), p.isMain()))
-                .collect(Collectors.toList());
-        r.setPhotos(photos);
-        photos.stream().filter(ListingPhotoResponse::isMain).findFirst()
-                .ifPresent(main -> r.setMainPhotoUrl(main.getUrl()));
-        if (r.getMainPhotoUrl() == null && !photos.isEmpty()) {
-            r.setMainPhotoUrl(photos.get(0).getUrl());
-        }
-
-        if (user != null) {
-            r.setMatchScore(matchScorer.score(user, listing));
-        }
-        return r;
-    }
-
-    private String buildPhotoUrl(Long photoId) {
-        return ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/api/rental-listings/photos/")
-                .path(String.valueOf(photoId))
-                .toUriString();
+        return mapper.map(listing, user);
     }
 
     private void enrichOwner(RentalListingResponse response, Long ownerId) {
-        if (ownerId == null) {
-            return;
-        }
-        try {
-            User owner = userService.getUserById(ownerId);
-            response.setOwnerName(owner.getName());
-            if (owner.getProfilePhoto() != null && owner.getProfilePhoto().length > 0) {
-                String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
-                        .path("/api/user/")
-                        .path(String.valueOf(ownerId))
-                        .path("/picture")
-                        .toUriString();
-                response.setOwnerPhotoUrl(photoUrl);
-            }
-        } catch (GenericException ignored) {
-            // owner missing; leave owner fields null
-        }
+        mapper.enrichOwner(response, ownerId);
     }
 }

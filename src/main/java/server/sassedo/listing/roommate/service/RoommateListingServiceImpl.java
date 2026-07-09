@@ -22,6 +22,7 @@ import server.sassedo.location.repository.CityRepository;
 import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
+import server.sassedo.utils.ImageUploadValidator;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -190,6 +191,7 @@ public class RoommateListingServiceImpl implements RoommateListingService {
             if (file == null || file.isEmpty()) {
                 continue;
             }
+            ImageUploadValidator.validate(file);
             RoommateListingPhoto photo = new RoommateListingPhoto();
             photo.setData(file.getBytes());
             photo.setContentType(file.getContentType());

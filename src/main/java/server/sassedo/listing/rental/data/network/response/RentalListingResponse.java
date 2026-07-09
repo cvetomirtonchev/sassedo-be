@@ -2,6 +2,7 @@ package server.sassedo.listing.rental.data.network.response;
 
 import lombok.Getter;
 import lombok.Setter;
+import server.sassedo.engagement.service.EngagementAware;
 import server.sassedo.listing.common.*;
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
 import server.sassedo.promotion.common.PromotionType;
@@ -14,7 +15,7 @@ import java.util.Set;
 
 @Getter
 @Setter
-public class RentalListingResponse {
+public class RentalListingResponse implements EngagementAware {
 
     private Long id;
     private Long ownerId;
@@ -68,4 +69,8 @@ public class RentalListingResponse {
     private boolean pinned;
 
     private Integer matchScore;
+
+    private long favoriteCount;
+    private long viewCount;
+    private boolean favoritedByMe;
 }

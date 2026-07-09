@@ -2,6 +2,7 @@ package server.sassedo.listing.roommate.data.network.response;
 
 import lombok.Getter;
 import lombok.Setter;
+import server.sassedo.engagement.service.EngagementAware;
 import server.sassedo.listing.common.*;
 import server.sassedo.promotion.common.PromotionType;
 import server.sassedo.user.data.dto.JobStatus;
@@ -16,7 +17,7 @@ import java.util.Set;
 
 @Getter
 @Setter
-public class RoommateListingResponse {
+public class RoommateListingResponse implements EngagementAware {
 
     private Long id;
     private Long ownerId;
@@ -85,4 +86,8 @@ public class RoommateListingResponse {
     // Compatibility (0-100) between the requesting user's profile and this listing's roommate
     // requirements. Only populated for authenticated requests; null otherwise.
     private Integer matchScore;
+
+    private long favoriteCount;
+    private long viewCount;
+    private boolean favoritedByMe;
 }

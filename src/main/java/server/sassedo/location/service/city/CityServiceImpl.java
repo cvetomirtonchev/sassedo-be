@@ -15,6 +15,7 @@ import server.sassedo.location.repository.CityRepository;
 import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
+import server.sassedo.utils.ImageUploadValidator;
 
 import java.io.IOException;
 import java.util.Comparator;
@@ -116,6 +117,7 @@ public class CityServiceImpl implements CityService {
         if (file == null || file.isEmpty()) {
             throw new GenericException(GenericExceptionCode.INVALID_FILE, "No file provided");
         }
+        ImageUploadValidator.validate(file);
         city.setImage(file.getBytes());
         city.setImageContentType(file.getContentType());
         return cityRepository.save(city);

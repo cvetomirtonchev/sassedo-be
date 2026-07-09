@@ -11,9 +11,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import server.sassedo.common.data.network.response.PageMeta;
 import server.sassedo.common.data.network.response.PagedResponse;
+import server.sassedo.engagement.service.EngagementEnricher;
+import server.sassedo.engagement.service.ListingViewService;
 import server.sassedo.listing.common.LeaseTerm;
 import server.sassedo.listing.common.ListingContactResponse;
 import server.sassedo.listing.common.ListingFilter;
@@ -26,6 +27,7 @@ import server.sassedo.listing.search.data.network.request.ApartmentSearchRequest
 import server.sassedo.listing.search.data.network.response.ApartmentSearchResponse;
 import server.sassedo.listing.search.service.ApartmentSearchService;
 import server.sassedo.model.GenericException;
+import server.sassedo.promotion.common.ListingType;
 import server.sassedo.security.jwt.JwtUtils;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.service.user.UserService;
@@ -47,6 +49,9 @@ public class ApartmentSearchController {
     private final ApartmentSearchService searchService;
     private final UserService userService;
     private final JwtUtils jwtUtils;
+    private final ApartmentSearchMapper mapper;
+    private final EngagementEnricher engagementEnricher;
+    private final ListingViewService listingViewService;
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody ApartmentSearchRequest request, HttpServletRequest httpRequest) {
@@ -70,7 +75,8 @@ public class ApartmentSearchController {
             @RequestParam(required = false) Set<LeaseTerm> leaseTerms,
             @RequestParam(defaultValue = "NEWEST") ListingSort sort,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest httpRequest) {
         ListingFilter filter = new ListingFilter();
         filter.setCityId(cityId);
         filter.setPropertyType(propertyType);
@@ -81,7 +87,7 @@ public class ApartmentSearchController {
         filter.setLeaseTerms(leaseTerms);
         Page<ApartmentSearch> results = searchService.browse(filter,
                 PageRequest.of(page, size, sort.toSort("budgetMax")));
-        return ResponseEntity.ok(toPagedResponse(results));
+        return ResponseEntity.ok(toPagedResponse(results, getUserId(httpRequest, jwtUtils)));
     }
 
     @GetMapping("/mine")
@@ -89,6 +95,7 @@ public class ApartmentSearchController {
         Long userId = getUserId(httpRequest, jwtUtils);
         List<ApartmentSearchResponse> content = searchService.getMyListings(userId).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
+        engagementEnricher.enrich(ListingType.SEARCH, content, userId, false);
         return ResponseEntity.ok(content);
     }
 
@@ -99,6 +106,9 @@ public class ApartmentSearchController {
             ApartmentSearch entity = searchService.getViewableById(id, userId, isAdmin());
             ApartmentSearchResponse response = mapToResponse(entity);
             enrichOwner(response, entity.getOwnerId());
+            String visitorId = httpRequest.getHeader("X-Visitor-Id");
+            listingViewService.recordView(ListingType.SEARCH, id, userId, visitorId, entity.getOwnerId());
+            engagementEnricher.enrich(ListingType.SEARCH, response, userId, true);
             return ResponseEntity.ok(response);
         } catch (GenericException e) {
             return ResponseEntity.status(404).body(e.getErrorResponse());
@@ -209,75 +219,22 @@ public class ApartmentSearchController {
     }
 
     private PagedResponse<ApartmentSearchResponse> toPagedResponse(Page<ApartmentSearch> results) {
+        return toPagedResponse(results, null);
+    }
+
+    private PagedResponse<ApartmentSearchResponse> toPagedResponse(Page<ApartmentSearch> results, Long userId) {
         List<ApartmentSearchResponse> content = results.getContent().stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
+        engagementEnricher.enrich(ListingType.SEARCH, content, userId, false);
         PageMeta meta = new PageMeta(results.getNumber(), results.getTotalPages(), results.getTotalElements());
         return new PagedResponse<>(content, meta);
     }
 
     private ApartmentSearchResponse mapToResponse(ApartmentSearch entity) {
-        ApartmentSearchResponse r = new ApartmentSearchResponse();
-        r.setId(entity.getId());
-        r.setOwnerId(entity.getOwnerId());
-        r.setStatus(entity.getStatus());
-        r.setCreatedAt(entity.getCreatedAt());
-        r.setUpdatedAt(entity.getUpdatedAt());
-        r.setExpiresAt(entity.getExpiresAt());
-        r.setPropertyType(entity.getPropertyType());
-
-        if (entity.getCountry() != null) {
-            r.setCountryId(entity.getCountry().getId());
-            r.setCountryNameEn(entity.getCountry().getNameEn());
-            r.setCountryNameBg(entity.getCountry().getNameBg());
-        }
-        if (entity.getCity() != null) {
-            r.setCityId(entity.getCity().getId());
-            r.setCityNameEn(entity.getCity().getNameEn());
-            r.setCityNameBg(entity.getCity().getNameBg());
-        }
-        r.setNeighborhood(entity.getNeighborhood());
-
-        r.setBudgetMin(entity.getBudgetMin());
-        r.setBudgetMax(entity.getBudgetMax());
-        r.setAvailableFrom(entity.getAvailableFrom());
-        r.setAvailableAsap(entity.isAvailableAsap());
-        r.setLeaseTerms(entity.getLeaseTerms());
-
-        r.setAge(entity.getAge());
-        r.setSex(entity.getSex());
-        r.setProfession(entity.getProfession());
-        r.setSmoker(entity.getSmoker());
-        r.setHasPets(entity.getHasPets());
-
-        r.setTitle(entity.getTitle());
-        r.setDescription(entity.getDescription());
-
-        if (entity.getPromotionState() != null) {
-            r.setPromotionType(entity.getPromotionState().getPromotionType());
-            r.setPromotionPriority(entity.getPromotionState().getPromotionPriority());
-            r.setPromotedUntil(entity.getPromotionState().getPromotedUntil());
-            r.setPinned(entity.getPromotionState().isPinned());
-        }
-        return r;
+        return mapper.map(entity);
     }
 
     private void enrichOwner(ApartmentSearchResponse response, Long ownerId) {
-        if (ownerId == null) {
-            return;
-        }
-        try {
-            User owner = userService.getUserById(ownerId);
-            response.setOwnerName(owner.getName());
-            if (owner.getProfilePhoto() != null && owner.getProfilePhoto().length > 0) {
-                String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
-                        .path("/api/user/")
-                        .path(String.valueOf(ownerId))
-                        .path("/picture")
-                        .toUriString();
-                response.setOwnerPhotoUrl(photoUrl);
-            }
-        } catch (GenericException ignored) {
-            // owner missing; leave owner fields null
-        }
+        mapper.enrichOwner(response, ownerId);
     }
 }

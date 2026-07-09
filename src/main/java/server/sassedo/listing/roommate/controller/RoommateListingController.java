@@ -13,9 +13,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import server.sassedo.common.data.network.response.PageMeta;
 import server.sassedo.common.data.network.response.PagedResponse;
+import server.sassedo.engagement.service.EngagementEnricher;
+import server.sassedo.engagement.service.ListingViewService;
 import server.sassedo.listing.common.ListingContactResponse;
 import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingSort;
@@ -25,11 +26,10 @@ import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.dto.RoommateListingPhoto;
 import server.sassedo.listing.roommate.data.network.request.RoommateListingRequest;
 import server.sassedo.listing.roommate.data.network.request.UpdateListingStatusRequest;
-import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
 import server.sassedo.listing.roommate.data.network.response.RoommateListingResponse;
-import server.sassedo.listing.roommate.matching.RoommateMatchScorer;
 import server.sassedo.listing.roommate.service.RoommateListingService;
 import server.sassedo.model.GenericException;
+import server.sassedo.promotion.common.ListingType;
 import server.sassedo.security.jwt.JwtUtils;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.service.user.UserService;
@@ -53,7 +53,9 @@ public class RoommateListingController {
     private final RoommateListingService listingService;
     private final UserService userService;
     private final JwtUtils jwtUtils;
-    private final RoommateMatchScorer matchScorer;
+    private final RoommateListingMapper mapper;
+    private final EngagementEnricher engagementEnricher;
+    private final ListingViewService listingViewService;
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody RoommateListingRequest request, HttpServletRequest httpRequest) {
@@ -121,9 +123,12 @@ public class RoommateListingController {
                     .collect(Collectors.toList());
         }
 
+        // When the Match filter is active, always rank by match percentage (highest first),
+        // regardless of the selected sort control.
+        ListingSort effectiveSort = minMatchScore != null ? ListingSort.BEST_MATCH : sort;
         Comparator<RoommateListingResponse> comparator = Comparator
                 .comparingInt(RoommateListingResponse::getPromotionPriority).reversed()
-                .thenComparing(matchOrListingComparator(sort));
+                .thenComparing(matchOrListingComparator(effectiveSort));
         List<RoommateListingResponse> ranked = mapped.stream()
                 .sorted(comparator)
                 .collect(Collectors.toList());
@@ -134,6 +139,7 @@ public class RoommateListingController {
         int to = Math.min(from + size, total);
         List<RoommateListingResponse> content = ranked.subList(from, to);
         content.forEach(r -> enrichOwner(r, r.getOwnerId()));
+        engagementEnricher.enrich(ListingType.ROOMMATE, content, user.getId(), false);
         return new PagedResponse<>(content, new PageMeta(page, totalPages, total));
     }
 
@@ -173,6 +179,7 @@ public class RoommateListingController {
         Long userId = getUserId(httpRequest, jwtUtils);
         List<RoommateListingResponse> content = listingService.getMyListings(userId).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
+        engagementEnricher.enrich(ListingType.ROOMMATE, content, userId, false);
         return ResponseEntity.ok(content);
     }
 
@@ -183,6 +190,9 @@ public class RoommateListingController {
             RoommateListing listing = listingService.getViewableById(id, userId, isAdmin());
             RoommateListingResponse response = mapToResponse(listing, resolveUser(userId));
             enrichOwner(response, listing.getOwnerId());
+            String visitorId = httpRequest.getHeader("X-Visitor-Id");
+            listingViewService.recordView(ListingType.ROOMMATE, id, userId, visitorId, listing.getOwnerId());
+            engagementEnricher.enrich(ListingType.ROOMMATE, response, userId, true);
             return ResponseEntity.ok(response);
         } catch (GenericException e) {
             return ResponseEntity.status(404).body(e.getErrorResponse());
@@ -352,120 +362,20 @@ public class RoommateListingController {
         List<RoommateListingResponse> content = listings.getContent().stream()
                 .map(listing -> mapToResponse(listing, user)).collect(Collectors.toList());
         content.forEach(r -> enrichOwner(r, r.getOwnerId()));
+        engagementEnricher.enrich(ListingType.ROOMMATE, content, user != null ? user.getId() : null, false);
         PageMeta meta = new PageMeta(listings.getNumber(), listings.getTotalPages(), listings.getTotalElements());
         return new PagedResponse<>(content, meta);
     }
 
     private RoommateListingResponse mapToResponse(RoommateListing listing) {
-        return mapToResponse(listing, null);
+        return mapper.map(listing);
     }
 
     private RoommateListingResponse mapToResponse(RoommateListing listing, User user) {
-        RoommateListingResponse r = new RoommateListingResponse();
-        r.setId(listing.getId());
-        r.setOwnerId(listing.getOwnerId());
-        r.setStatus(listing.getStatus());
-        r.setCreatedAt(listing.getCreatedAt());
-        r.setUpdatedAt(listing.getUpdatedAt());
-        r.setExpiresAt(listing.getExpiresAt());
-        // Treat a null column (rows predating this feature) as "has property".
-        r.setHasProperty(listing.getHasProperty() == null || listing.getHasProperty());
-        r.setBudget(listing.getBudget());
-        r.setPropertyType(listing.getPropertyType());
-
-        if (listing.getCountry() != null) {
-            r.setCountryId(listing.getCountry().getId());
-            r.setCountryNameEn(listing.getCountry().getNameEn());
-            r.setCountryNameBg(listing.getCountry().getNameBg());
-        }
-        if (listing.getCity() != null) {
-            r.setCityId(listing.getCity().getId());
-            r.setCityNameEn(listing.getCity().getNameEn());
-            r.setCityNameBg(listing.getCity().getNameBg());
-        }
-        r.setNeighborhood(listing.getNeighborhood());
-        r.setAddress(listing.getAddress());
-
-        r.setRent(listing.getRent());
-        r.setCostsIncluded(listing.getCostsIncluded());
-        r.setDeposit(listing.getDeposit());
-        r.setRoomsCount(listing.getRoomsCount());
-        r.setFurnished(listing.getFurnished());
-        r.setPetsAllowed(listing.getPetsAllowed());
-        r.setAvailableFrom(listing.getAvailableFrom());
-        r.setAvailableAsap(listing.isAvailableAsap());
-        r.setBedrooms(listing.getBedrooms());
-        r.setBathrooms(listing.getBathrooms());
-        r.setOwner(listing.getOwner());
-
-        r.setIncludedUtilities(listing.getIncludedUtilities());
-        r.setExtraServices(listing.getExtraServices());
-        r.setNearbyAmenities(listing.getNearbyAmenities());
-        r.setRoomAmenities(listing.getRoomAmenities());
-
-        r.setPreferredSex(listing.getPreferredSex());
-        r.setPreferredOrientation(listing.getPreferredOrientation());
-        r.setAgeMin(listing.getAgeMin());
-        r.setAgeMax(listing.getAgeMax());
-        r.setSmokingPreference(listing.getSmokingPreference());
-        r.setOccupationPreference(listing.getOccupationPreference());
-        r.setAdditionalRequirements(listing.getAdditionalRequirements());
-        r.setPetPolicy(listing.getPetPolicy());
-        r.setPeopleInProperty(listing.getPeopleInProperty());
-        r.setSpokenLanguages(listing.getSpokenLanguages());
-        r.setEmploymentStatus(listing.getEmploymentStatus());
-        r.setAboutMe(listing.getAboutMe());
-
-        r.setTitle(listing.getTitle());
-        r.setDescription(listing.getDescription());
-
-        if (listing.getPromotionState() != null) {
-            r.setPromotionType(listing.getPromotionState().getPromotionType());
-            r.setPromotionPriority(listing.getPromotionState().getPromotionPriority());
-            r.setPromotedUntil(listing.getPromotionState().getPromotedUntil());
-            r.setPinned(listing.getPromotionState().isPinned());
-        }
-
-        List<ListingPhotoResponse> photos = listing.getPhotos().stream()
-                .map(p -> new ListingPhotoResponse(p.getId(), buildPhotoUrl(p.getId()), p.isMain()))
-                .collect(Collectors.toList());
-        r.setPhotos(photos);
-        photos.stream().filter(ListingPhotoResponse::isMain).findFirst()
-                .ifPresent(main -> r.setMainPhotoUrl(main.getUrl()));
-        if (r.getMainPhotoUrl() == null && !photos.isEmpty()) {
-            r.setMainPhotoUrl(photos.get(0).getUrl());
-        }
-
-        if (user != null) {
-            r.setMatchScore(matchScorer.score(user, listing));
-        }
-        return r;
-    }
-
-    private String buildPhotoUrl(Long photoId) {
-        return ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/api/roommate-listings/photos/")
-                .path(String.valueOf(photoId))
-                .toUriString();
+        return mapper.map(listing, user);
     }
 
     private void enrichOwner(RoommateListingResponse response, Long ownerId) {
-        if (ownerId == null) {
-            return;
-        }
-        try {
-            User owner = userService.getUserById(ownerId);
-            response.setOwnerName(owner.getName());
-            if (owner.getProfilePhoto() != null && owner.getProfilePhoto().length > 0) {
-                String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
-                        .path("/api/user/")
-                        .path(String.valueOf(ownerId))
-                        .path("/picture")
-                        .toUriString();
-                response.setOwnerPhotoUrl(photoUrl);
-            }
-        } catch (GenericException ignored) {
-            // owner missing; leave owner fields null
-        }
+        mapper.enrichOwner(response, ownerId);
     }
 }

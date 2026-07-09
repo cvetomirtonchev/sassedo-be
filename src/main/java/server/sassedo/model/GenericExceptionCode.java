@@ -21,6 +21,11 @@ public enum GenericExceptionCode {
     HELPER_TEXT_NOT_FOUND,
     FAQ_NOT_FOUND,
 
+    // BLOG
+    BLOG_POST_NOT_FOUND,
+    BLOG_IMAGE_NOT_FOUND,
+    BLOG_SLUG_EXISTS,
+
     // CARD
     CARD_NOT_FOUND,
 

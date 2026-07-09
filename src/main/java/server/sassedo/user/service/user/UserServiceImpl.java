@@ -14,6 +14,7 @@ import server.sassedo.location.repository.CityRepository;
 import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
+import server.sassedo.utils.ImageUploadValidator;
 import server.sassedo.user.data.dto.ERole;
 import server.sassedo.user.data.dto.PasswordResetToken;
 import server.sassedo.user.data.dto.Role;
@@ -413,6 +414,7 @@ public class UserServiceImpl implements UserService {
         if (file == null || file.isEmpty()) {
             throw new GenericException(GenericExceptionCode.INVALID_FILE, "No file provided");
         }
+        ImageUploadValidator.validate(file);
         user.setProfilePhoto(file.getBytes());
         return userRepository.save(user);
     }
