@@ -48,6 +48,14 @@ public class Conversation {
     @Column(length = 255)
     private String title;
 
+    /** Id of the most recent message; denormalized so the inbox avoids a per-row "latest message" query. */
+    @Column(name = "last_message_id")
+    private Long lastMessageId;
+
+    /** Denormalized preview of the most recent message body so the inbox list needs no message join. */
+    @Column(name = "last_message_preview", length = 500)
+    private String lastMessagePreview;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

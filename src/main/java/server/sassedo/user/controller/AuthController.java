@@ -46,9 +46,6 @@ public class AuthController {
     @Autowired
     UserService userService;
 
-    @Value("${feria.app.clientUrl}")
-    private String clientUrl;
-
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
 

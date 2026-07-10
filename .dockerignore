@@ -1,0 +1,40 @@
+# Build output
+target/
+out/
+dist/
+
+# Version control / metadata
+.git/
+.gitignore
+.gitattributes
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+
+# Logs
+logs/
+*.log
+
+# Environment / secrets
+.env
+.env.*
+*.env
+
+# Deployment assets not needed inside the build context
+deploy/
+docs/
+scripts/
+*.md
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db

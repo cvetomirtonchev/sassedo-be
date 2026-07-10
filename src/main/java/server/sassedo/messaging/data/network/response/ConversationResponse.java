@@ -20,6 +20,7 @@ public class ConversationResponse {
 
     private String lastMessagePreview;
     private LocalDateTime lastMessageAt;
+    private Long lastMessageId;
     private long unreadCount;
 
     private LocalDateTime createdAt;

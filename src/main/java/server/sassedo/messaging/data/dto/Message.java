@@ -13,9 +13,14 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Entity
-@Table(name = "messages", indexes = {
-        @Index(name = "idx_message_conversation_created", columnList = "conversation_id, created_at")
-})
+@Table(name = "messages",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_message_sender_client_id", columnNames = {"sender_id", "client_message_id"})
+        },
+        indexes = {
+                @Index(name = "idx_message_conversation_created", columnList = "conversation_id, created_at"),
+                @Index(name = "idx_message_conversation_id", columnList = "conversation_id, id")
+        })
 public class Message {
 
     @Id
@@ -27,6 +32,13 @@ public class Message {
 
     @Column(name = "sender_id", nullable = false)
     private Long senderId;
+
+    /**
+     * Client-supplied idempotency key. A retried send with the same (sender, clientMessageId) returns the
+     * already-persisted message instead of creating a duplicate. Nullable for legacy/absent clients.
+     */
+    @Column(name = "client_message_id", length = 64)
+    private String clientMessageId;
 
     @Lob
     @Column(columnDefinition = "TEXT", nullable = false)
