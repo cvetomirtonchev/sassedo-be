@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface FaqService {
 
-    List<Faq> getAll();
+    List<Faq> getAllOrdered();
 
     Faq getById(Long id) throws GenericException;
 

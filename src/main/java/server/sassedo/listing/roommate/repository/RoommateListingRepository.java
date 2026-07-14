@@ -21,6 +21,10 @@ public interface RoommateListingRepository extends JpaRepository<RoommateListing
 
     List<RoommateListing> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);
 
+    @Query(value = "SELECT * FROM roommate_listings WHERE status = 'ACTIVE' ORDER BY RAND() LIMIT :limit",
+            nativeQuery = true)
+    List<RoommateListing> findRandomActive(@Param("limit") int limit);
+
     @Query("SELECT l FROM RoommateListing l LEFT JOIN l.city c WHERE " +
             "(:status IS NULL OR l.status = :status) " +
             "AND (:cityId IS NULL OR c.id = :cityId) " +

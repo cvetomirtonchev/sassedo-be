@@ -21,6 +21,10 @@ public interface RentalListingRepository extends JpaRepository<RentalListing, Lo
 
     List<RentalListing> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);
 
+    @Query(value = "SELECT * FROM rental_listings WHERE status = 'ACTIVE' ORDER BY RAND() LIMIT :limit",
+            nativeQuery = true)
+    List<RentalListing> findRandomActive(@Param("limit") int limit);
+
     @Query("SELECT l FROM RentalListing l LEFT JOIN l.city c WHERE " +
             "(:status IS NULL OR l.status = :status) " +
             "AND (:cityId IS NULL OR c.id = :cityId) " +

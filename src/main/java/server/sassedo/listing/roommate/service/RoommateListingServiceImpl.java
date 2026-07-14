@@ -94,6 +94,11 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     }
 
     @Override
+    public List<RoommateListing> randomActive(int limit) {
+        return listingRepository.findRandomActive(limit);
+    }
+
+    @Override
     public Page<RoommateListing> adminSearch(ListingStatus status, String search, Pageable pageable) {
         return listingRepository.adminSearch(status, search, pageable);
     }

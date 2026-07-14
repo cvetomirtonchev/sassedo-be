@@ -20,6 +20,10 @@ public enum GenericExceptionCode {
     // COMMON
     HELPER_TEXT_NOT_FOUND,
     FAQ_NOT_FOUND,
+    FAQ_INVALID_LOCALE,
+    HERO_SLIDE_NOT_FOUND,
+    HERO_IMAGE_NOT_FOUND,
+    HERO_INVALID_CTA_URL,
 
     // BLOG
     BLOG_POST_NOT_FOUND,

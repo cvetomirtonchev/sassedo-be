@@ -94,6 +94,11 @@ public class RentalListingServiceImpl implements RentalListingService {
     }
 
     @Override
+    public List<RentalListing> randomActive(int limit) {
+        return listingRepository.findRandomActive(limit);
+    }
+
+    @Override
     public Page<RentalListing> adminSearch(ListingStatus status, String search, Pageable pageable) {
         return listingRepository.adminSearch(status, search, pageable);
     }

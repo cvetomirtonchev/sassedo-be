@@ -174,6 +174,19 @@ public class RoommateListingController {
         }
     }
 
+    @GetMapping("/random")
+    public ResponseEntity<?> random(
+            @RequestParam(defaultValue = "8") int limit, HttpServletRequest httpRequest) {
+        int safeLimit = Math.min(Math.max(limit, 1), 24);
+        User user = resolveUser(getUserId(httpRequest, jwtUtils));
+        List<RoommateListingResponse> content = listingService.randomActive(safeLimit).stream()
+                .map(listing -> mapToResponse(listing, user))
+                .collect(Collectors.toList());
+        content.forEach(r -> enrichOwner(r, r.getOwnerId()));
+        engagementEnricher.enrich(ListingType.ROOMMATE, content, user != null ? user.getId() : null, false);
+        return ResponseEntity.ok(content);
+    }
+
     @GetMapping("/mine")
     public ResponseEntity<?> myListings(HttpServletRequest httpRequest) {
         Long userId = getUserId(httpRequest, jwtUtils);

@@ -27,6 +27,8 @@ public interface RentalListingService {
 
     List<RentalListing> browseAllForMatch(ListingFilter filter);
 
+    List<RentalListing> randomActive(int limit);
+
     Page<RentalListing> adminSearch(ListingStatus status, String search, Pageable pageable);
 
     List<RentalListing> getMyListings(Long ownerId);

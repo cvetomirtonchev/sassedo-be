@@ -1,25 +1,22 @@
-package server.sassedo.common.data.network.request;
+package server.sassedo.common.data.network.response;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-
-public class UpdateFaqRequest {
-    @NotNull
+public class FaqAdminResponse {
     private Long id;
-
-    @Size(max = 1000)
     private String questionBg;
-
-    @Size(max = 1000)
     private String questionEn;
-
     private String answerBg;
-
     private String answerEn;
+    private int sortOrder;
 
-    @Min(0)
-    private Integer sortOrder;
+    public FaqAdminResponse(Long id, String questionBg, String questionEn,
+                            String answerBg, String answerEn, int sortOrder) {
+        this.id = id;
+        this.questionBg = questionBg;
+        this.questionEn = questionEn;
+        this.answerBg = answerBg;
+        this.answerEn = answerEn;
+        this.sortOrder = sortOrder;
+    }
 
     public Long getId() {
         return id;
@@ -61,11 +58,11 @@ public class UpdateFaqRequest {
         this.answerEn = answerEn;
     }
 
-    public Integer getSortOrder() {
+    public int getSortOrder() {
         return sortOrder;
     }
 
-    public void setSortOrder(Integer sortOrder) {
+    public void setSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
     }
 }
