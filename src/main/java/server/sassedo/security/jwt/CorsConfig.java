@@ -17,7 +17,8 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "http://185.228.27.76:4200"
+                "http://185.228.27.76:4200",
+                "https://sassedo-fe.vercel.app"
         )); // or use "*" for allowing all origins
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Visitor-Id"));
