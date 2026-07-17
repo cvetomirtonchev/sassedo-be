@@ -81,6 +81,52 @@ switch back to `0` and re-run once the flow works.
 This creates a temporary self-signed cert, starts nginx, requests the real certificate over the
 HTTP-01 webroot challenge, and reloads nginx. The `certbot` service then auto-renews it.
 
+### Alternative: temporary access by IP (no domain yet)
+
+Use this only while you do not have a domain/certificate. It serves the API over plain HTTP
+(no TLS) on port 80 through nginx, keeping `app` and `mysql` on the internal network. Do not
+run `deploy/init-letsencrypt.sh` in this mode.
+
+1. Make sure port 80 is reachable:
+
+   ```bash
+   sudo ufw allow 80/tcp
+   ```
+
+   Also open inbound TCP 80 in the cloud firewall / AWS security group for this instance.
+
+2. `APP_DOMAIN` in `.env` can keep any placeholder value; it is not used by the IP template.
+
+3. Start the stack with the IP overlay (note the two `-f` flags):
+
+   ```bash
+   docker compose -f compose.yaml -f compose.ip.yaml up -d --build
+   ```
+
+4. Verify over HTTP using the public IP (example `3.121.162.2`):
+
+   ```bash
+   curl -I http://3.121.162.2
+   curl http://3.121.162.2/api/faq/all
+   ```
+
+Because traffic is unencrypted, treat this as temporary. Switch to the domain + TLS flow below
+as soon as DNS is ready.
+
+#### Switching from IP mode to the domain + TLS setup
+
+```bash
+# 1. Point the domain's A record at the server and set APP_DOMAIN/LETSENCRYPT_EMAIL in .env
+# 2. Stop the IP-mode nginx so port 80 is free for the ACME challenge
+docker compose -f compose.yaml -f compose.ip.yaml down
+
+# 3. Issue the certificate and bring up the standard (domain) stack
+./deploy/init-letsencrypt.sh
+docker compose up -d --build
+```
+
+From then on, always use the plain `docker compose ...` commands (without `-f compose.ip.yaml`).
+
 ## 4. Start the stack
 
 ```bash

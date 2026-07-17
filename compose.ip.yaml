@@ -1,0 +1,20 @@
+# Temporary overlay for direct IP access over plain HTTP (no domain / TLS yet).
+#
+# Usage:
+#   docker compose -f compose.yaml -f compose.ip.yaml up -d --build
+#
+# This keeps `app` and `mysql` on the internal network and exposes only nginx
+# on port 80, serving the HTTP-only template in deploy/nginx/ip-templates.
+# When your domain is ready, drop the `-f compose.ip.yaml` flag and follow the
+# Let's Encrypt flow in docs/ubuntu-docker-deployment.md.
+services:
+  nginx:
+    volumes:
+      - ./deploy/nginx/ip-templates:/etc/nginx/templates:ro
+    # Plain nginx: no periodic reload needed since there are no certs to renew.
+    command: ["nginx", "-g", "daemon off;"]
+
+  # No certificates to renew in IP mode; keep the container idle instead of
+  # looping certbot renew against a domain that is not configured yet.
+  certbot:
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do sleep 12h & wait $${!}; done"]

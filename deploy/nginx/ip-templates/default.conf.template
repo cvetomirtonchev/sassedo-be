@@ -1,0 +1,45 @@
+# Temporary HTTP-only reverse proxy for direct IP access (no TLS).
+# Used while a domain/certificate is not yet available. Swap back to
+# deploy/nginx/templates for the domain + Let's Encrypt setup.
+
+upstream sassedo_app {
+    server app:8080;
+    keepalive 32;
+}
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    # Matches spring.servlet.multipart.max-request-size with headroom.
+    client_max_body_size 15m;
+
+    # Server-Sent Events: no buffering, long-lived connections.
+    location /api/conversations/events {
+        proxy_pass http://sassedo_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location / {
+        proxy_pass http://sassedo_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_read_timeout 300s;
+    }
+}
