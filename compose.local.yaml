@@ -1,0 +1,11 @@
+# Untracked local override. The committed healthcheck probes /actuator/health on 8081,
+# but WebSecurityConfig secures that endpoint (returns 401), so it never passes.
+# Probe a permitAll endpoint that also exercises the DB instead.
+services:
+  app:
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/faq/all >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
