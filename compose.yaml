@@ -79,7 +79,10 @@ services:
       /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & exec nginx -g 'daemon off;'"
 
   certbot:
-    image: certbot/certbot:latest
+    # Pinned: certbot 3.x images run on Python 3.12 which hits a
+    # "RecursionError: maximum recursion depth exceeded" during ACME requests.
+    # v2.11.0 is the last Python 3.11-based release and works reliably.
+    image: certbot/certbot:v2.11.0
     restart: unless-stopped
     volumes:
       - certbot-conf:/etc/letsencrypt
