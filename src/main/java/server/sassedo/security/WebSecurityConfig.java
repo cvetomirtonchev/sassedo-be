@@ -63,6 +63,7 @@ public class WebSecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/lost-password/**").permitAll()
                         .requestMatchers("/api/common/helper-texts").permitAll()
