@@ -30,8 +30,6 @@ import server.sassedo.listing.rental.data.network.response.RentalListingResponse
 import server.sassedo.listing.rental.service.RentalListingService;
 import server.sassedo.listing.roommate.data.network.request.UpdateListingStatusRequest;
 import server.sassedo.model.GenericException;
-import server.sassedo.moderation.risk.web.ClientIpResolver;
-import server.sassedo.moderation.risk.web.dto.SubmissionResponse;
 import server.sassedo.promotion.common.ListingType;
 import server.sassedo.security.jwt.JwtUtils;
 import server.sassedo.user.data.dto.User;
@@ -59,7 +57,6 @@ public class RentalListingController {
     private final RentalListingMapper mapper;
     private final EngagementEnricher engagementEnricher;
     private final ListingViewService listingViewService;
-    private final ClientIpResolver clientIpResolver;
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody RentalListingRequest request, HttpServletRequest httpRequest) {
@@ -236,18 +233,6 @@ public class RentalListingController {
         try {
             RentalListing listing = listingService.update(id, userId, false, request);
             return ResponseEntity.ok(mapToResponse(listing));
-        } catch (GenericException e) {
-            return ResponseEntity.badRequest().body(e.getErrorResponse());
-        }
-    }
-
-    @PostMapping("/{id}/submit")
-    public ResponseEntity<?> submit(@PathVariable Long id, HttpServletRequest httpRequest) {
-        Long userId = getUserId(httpRequest, jwtUtils);
-        try {
-            SubmissionResponse response = SubmissionResponse.from(
-                    listingService.submit(id, userId, clientIpResolver.resolve(httpRequest)));
-            return ResponseEntity.ok(response);
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());
         }
