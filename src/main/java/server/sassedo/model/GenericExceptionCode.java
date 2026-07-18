@@ -24,6 +24,7 @@ public enum GenericExceptionCode {
     HERO_SLIDE_NOT_FOUND,
     HERO_IMAGE_NOT_FOUND,
     HERO_INVALID_CTA_URL,
+    CONTACT_EMAIL_REQUIRED,
 
     // BLOG
     BLOG_POST_NOT_FOUND,
