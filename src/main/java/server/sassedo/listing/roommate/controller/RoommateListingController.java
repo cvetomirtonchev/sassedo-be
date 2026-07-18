@@ -22,6 +22,8 @@ import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingSort;
 import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.PropertyType;
+import server.sassedo.listing.common.RoomArrangement;
+import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.dto.RoommateListingPhoto;
 import server.sassedo.listing.roommate.data.network.request.RoommateListingRequest;
@@ -29,8 +31,13 @@ import server.sassedo.listing.roommate.data.network.request.UpdateListingStatusR
 import server.sassedo.listing.roommate.data.network.response.RoommateListingResponse;
 import server.sassedo.listing.roommate.service.RoommateListingService;
 import server.sassedo.model.GenericException;
+import server.sassedo.moderation.risk.web.ClientIpResolver;
+import server.sassedo.moderation.risk.web.dto.SubmissionResponse;
 import server.sassedo.promotion.common.ListingType;
 import server.sassedo.security.jwt.JwtUtils;
+import server.sassedo.user.data.dto.JobStatus;
+import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.dto.Sex;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.service.user.UserService;
 
@@ -56,6 +63,7 @@ public class RoommateListingController {
     private final RoommateListingMapper mapper;
     private final EngagementEnricher engagementEnricher;
     private final ListingViewService listingViewService;
+    private final ClientIpResolver clientIpResolver;
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody RoommateListingRequest request, HttpServletRequest httpRequest) {
@@ -80,6 +88,15 @@ public class RoommateListingController {
             @RequestParam(required = false) Integer minBedrooms,
             @RequestParam(required = false) Integer minBathrooms,
             @RequestParam(required = false) Set<String> amenities,
+            @RequestParam(required = false) Integer ageMin,
+            @RequestParam(required = false) Integer ageMax,
+            @RequestParam(required = false) Sex preferredSex,
+            @RequestParam(required = false) Boolean petsAllowed,
+            @RequestParam(required = false) SmokerPreference smokingPreference,
+            @RequestParam(required = false) JobStatus employmentStatus,
+            @RequestParam(required = false) Set<Language> spokenLanguages,
+            @RequestParam(required = false) RoomArrangement roomArrangement,
+            @RequestParam(required = false) Boolean hasChildren,
             @RequestParam(required = false) Integer minMatchScore,
             @RequestParam(defaultValue = "NEWEST") ListingSort sort,
             @RequestParam(defaultValue = "0") int page,
@@ -96,6 +113,15 @@ public class RoommateListingController {
         filter.setMinBedrooms(minBedrooms);
         filter.setMinBathrooms(minBathrooms);
         filter.setAmenities(amenities);
+        filter.setAgeMin(ageMin);
+        filter.setAgeMax(ageMax);
+        filter.setPreferredSex(preferredSex);
+        filter.setPetsAllowed(petsAllowed);
+        filter.setSmokingPreference(smokingPreference);
+        filter.setEmploymentStatus(employmentStatus);
+        filter.setSpokenLanguages(spokenLanguages);
+        filter.setRoomArrangement(roomArrangement);
+        filter.setHasChildren(hasChildren);
 
         User user = resolveUser(getUserId(httpRequest, jwtUtils));
 
@@ -230,6 +256,18 @@ public class RoommateListingController {
         try {
             RoommateListing listing = listingService.update(id, userId, false, request);
             return ResponseEntity.ok(mapToResponse(listing));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<?> submit(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            SubmissionResponse response = SubmissionResponse.from(
+                    listingService.submit(id, userId, clientIpResolver.resolve(httpRequest)));
+            return ResponseEntity.ok(response);
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());
         }

@@ -65,6 +65,8 @@ public class RoommateListingMapper {
         r.setAvailableAsap(listing.isAvailableAsap());
         r.setBedrooms(listing.getBedrooms());
         r.setBathrooms(listing.getBathrooms());
+        r.setAreaSqm(listing.getAreaSqm());
+        r.setRoomArrangement(listing.getRoomArrangement());
         r.setOwner(listing.getOwner());
 
         r.setIncludedUtilities(listing.getIncludedUtilities());
@@ -83,6 +85,7 @@ public class RoommateListingMapper {
         r.setPeopleInProperty(listing.getPeopleInProperty());
         r.setSpokenLanguages(listing.getSpokenLanguages());
         r.setEmploymentStatus(listing.getEmploymentStatus());
+        r.setHasChildren(listing.getHasChildren());
         r.setAboutMe(listing.getAboutMe());
 
         r.setTitle(listing.getTitle());

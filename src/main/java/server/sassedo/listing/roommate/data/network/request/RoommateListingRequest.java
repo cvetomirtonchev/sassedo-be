@@ -42,6 +42,8 @@ public class RoommateListingRequest {
     private boolean availableAsap;
     private Integer bedrooms;
     private Integer bathrooms;
+    private Integer areaSqm;
+    private RoomArrangement roomArrangement;
     private Boolean owner;
 
     private Set<Utility> includedUtilities = new LinkedHashSet<>();
@@ -61,6 +63,7 @@ public class RoommateListingRequest {
     private Integer peopleInProperty;
     private Set<Language> spokenLanguages = new LinkedHashSet<>();
     private JobStatus employmentStatus;
+    private Boolean hasChildren;
     private String aboutMe;
 
     // Step 6

@@ -61,6 +61,19 @@ public final class RentalListingSpecifications {
             if (f.getMinBathrooms() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("bathrooms"), f.getMinBathrooms()));
             }
+            // Shared-space willingness. Not willing (FALSE) excludes listings that require a shared
+            // bedroom/bathroom; a null column predates the flag and is treated as not shared. Willing
+            // (TRUE) imposes no restriction, so all listings remain.
+            if (Boolean.FALSE.equals(f.getSharedBedroom())) {
+                predicates.add(cb.or(
+                        cb.isNull(root.get("sharedBedroom")),
+                        cb.isFalse(root.get("sharedBedroom"))));
+            }
+            if (Boolean.FALSE.equals(f.getSharedBathroom())) {
+                predicates.add(cb.or(
+                        cb.isNull(root.get("sharedBathroom")),
+                        cb.isFalse(root.get("sharedBathroom"))));
+            }
             if (f.getLeaseTerms() != null && !f.getLeaseTerms().isEmpty()) {
                 Subquery<Long> sub = query.subquery(Long.class);
                 Root<RentalListing> subRoot = sub.from(RentalListing.class);

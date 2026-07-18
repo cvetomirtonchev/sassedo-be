@@ -22,6 +22,16 @@ import server.sassedo.location.repository.CityRepository;
 import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
+import server.sassedo.moderation.risk.domain.ImageFingerprint;
+import server.sassedo.moderation.risk.domain.ListingSnapshot;
+import server.sassedo.moderation.risk.domain.RiskAssessment;
+import server.sassedo.moderation.risk.service.ListingFingerprintService;
+import server.sassedo.moderation.risk.service.ListingSnapshotFactory;
+import server.sassedo.moderation.risk.service.PhotoHasher;
+import server.sassedo.moderation.risk.service.RiskSubmissionService;
+import server.sassedo.promotion.common.ListingType;
+import server.sassedo.user.data.dto.User;
+import server.sassedo.user.service.user.UserService;
 import server.sassedo.utils.ImageUploadValidator;
 
 import java.io.IOException;
@@ -38,6 +48,10 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     private final RoommateListingPhotoRepository photoRepository;
     private final CountryRepository countryRepository;
     private final CityRepository cityRepository;
+    private final ListingSnapshotFactory snapshotFactory;
+    private final RiskSubmissionService riskSubmissionService;
+    private final ListingFingerprintService fingerprintService;
+    private final UserService userService;
 
     @Value("${sassedo.listings.ttl-days:30}")
     private long listingTtlDays;
@@ -50,7 +64,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         }
         RoommateListing listing = new RoommateListing();
         listing.setOwnerId(ownerId);
-        listing.setStatus(ListingStatus.PENDING);
+        // New listings start as drafts; publication happens only through submit() after risk scoring.
+        listing.setStatus(ListingStatus.DRAFT);
         applyRequest(listing, request);
         return listingRepository.save(listing);
     }
@@ -116,9 +131,10 @@ public class RoommateListingServiceImpl implements RoommateListingService {
             throw new GenericException(GenericExceptionCode.NOT_LISTING_OWNER, "You are not the owner of this listing");
         }
         applyRequest(listing, request);
-        // A user editing their own listing resets it to pending review; admins keep the current status.
+        // Editing invalidates any prior approval: the listing returns to draft and must be
+        // re-submitted so the risk engine re-scores the new content. Admins keep the current status.
         if (!admin) {
-            listing.setStatus(ListingStatus.PENDING);
+            listing.setStatus(ListingStatus.DRAFT);
         }
         return listingRepository.save(listing);
     }
@@ -134,7 +150,31 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         if (status == ListingStatus.ACTIVE) {
             listing.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
         }
-        return listingRepository.save(listing);
+        RoommateListing saved = listingRepository.save(listing);
+        fingerprintService.updateStatus(ListingType.ROOMMATE, saved.getId(), status);
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public RiskAssessment submit(Long id, Long ownerId, String clientIp) throws GenericException {
+        RoommateListing listing = requireOwner(id, ownerId);
+        return evaluateAndApply(listing, clientIp);
+    }
+
+    private RiskAssessment evaluateAndApply(RoommateListing listing, String clientIp) throws GenericException {
+        User owner = userService.getUserById(listing.getOwnerId());
+        ListingSnapshot snapshot = snapshotFactory.roommate(listing);
+        List<ImageFingerprint> images = PhotoHasher.fromRows(photoRepository.findHashRowsByListingId(listing.getId()));
+        RiskAssessment assessment = riskSubmissionService.evaluate(
+                snapshot, owner, images, clientIp, listing.getStatus());
+        ListingStatus finalStatus = assessment.decision().resultingStatus();
+        listing.setStatus(finalStatus);
+        if (finalStatus == ListingStatus.ACTIVE) {
+            listing.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
+        }
+        listingRepository.save(listing);
+        return assessment;
     }
 
     @Override
@@ -153,16 +193,18 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     public RoommateListing deactivate(Long id, Long ownerId) throws GenericException {
         RoommateListing listing = requireOwner(id, ownerId);
         listing.setStatus(ListingStatus.INACTIVE);
-        return listingRepository.save(listing);
+        RoommateListing saved = listingRepository.save(listing);
+        fingerprintService.updateStatus(ListingType.ROOMMATE, saved.getId(), ListingStatus.INACTIVE);
+        return saved;
     }
 
     @Override
     @Transactional
     public RoommateListing reactivate(Long id, Long ownerId) throws GenericException {
         RoommateListing listing = requireOwner(id, ownerId);
-        listing.setStatus(ListingStatus.ACTIVE);
-        listing.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
-        return listingRepository.save(listing);
+        // Reactivation is a re-publication, so it must pass through the risk engine.
+        evaluateAndApply(listing, null);
+        return listing;
     }
 
     private RoommateListing requireOwner(Long id, Long ownerId) throws GenericException {
@@ -198,8 +240,12 @@ public class RoommateListingServiceImpl implements RoommateListingService {
             }
             ImageUploadValidator.validate(file);
             RoommateListingPhoto photo = new RoommateListingPhoto();
-            photo.setData(file.getBytes());
+            byte[] bytes = file.getBytes();
+            photo.setData(bytes);
             photo.setContentType(file.getContentType());
+            // Hash once at upload so submission-time duplicate checks never touch image BLOBs.
+            photo.setSha256(PhotoHasher.sha256(bytes));
+            photo.setDhash(PhotoHasher.dHash(bytes));
             photo.setListing(listing);
             boolean isMain = (mainIndex != null && mainIndex == i) || (!hasMain && i == 0 && mainIndex == null);
             if (isMain) {
@@ -209,6 +255,9 @@ public class RoommateListingServiceImpl implements RoommateListingService {
             photo.setMain(isMain);
             listing.getPhotos().add(photo);
         }
+        // Changing photos invalidates any prior approval; the owner must re-submit.
+        listing.setStatus(ListingStatus.DRAFT);
+        listing.setContentRevision(listing.getContentRevision() + 1);
         return listingRepository.save(listing);
     }
 
@@ -232,6 +281,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     }
 
     private void applyRequest(RoommateListing listing, RoommateListingRequest request) throws GenericException {
+        // Bump the content revision on every edit so the risk engine can detect concurrent changes.
+        listing.setContentRevision(listing.getContentRevision() + 1);
         // Default to "has property" when the client omits the flag (backward compatibility).
         boolean hasProperty = request.getHasProperty() == null || request.getHasProperty();
         listing.setHasProperty(hasProperty);
@@ -271,6 +322,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         listing.setAvailableAsap(request.isAvailableAsap());
         listing.setBedrooms(request.getBedrooms());
         listing.setBathrooms(request.getBathrooms());
+        listing.setAreaSqm(request.getAreaSqm());
+        listing.setRoomArrangement(request.getRoomArrangement());
         listing.setOwner(request.getOwner());
 
         listing.getIncludedUtilities().clear();
@@ -304,6 +357,7 @@ public class RoommateListingServiceImpl implements RoommateListingService {
             listing.getSpokenLanguages().addAll(request.getSpokenLanguages());
         }
         listing.setEmploymentStatus(request.getEmploymentStatus());
+        listing.setHasChildren(request.getHasChildren());
         listing.setAboutMe(request.getAboutMe());
 
         listing.setTitle(request.getTitle());
@@ -344,6 +398,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         listing.setAvailableAsap(request.isAvailableAsap());
         listing.setBedrooms(null);
         listing.setBathrooms(null);
+        listing.setAreaSqm(null);
+        listing.setRoomArrangement(null);
         listing.setOwner(null);
 
         listing.getIncludedUtilities().clear();
@@ -365,6 +421,7 @@ public class RoommateListingServiceImpl implements RoommateListingService {
             listing.getSpokenLanguages().addAll(request.getSpokenLanguages());
         }
         listing.setEmploymentStatus(request.getEmploymentStatus());
+        listing.setHasChildren(request.getHasChildren());
         listing.setAboutMe(request.getAboutMe());
 
         listing.setTitle(request.getTitle());

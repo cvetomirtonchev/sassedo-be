@@ -99,6 +99,15 @@ public class RoommateListing {
 
     private Integer bathrooms;
 
+    /** Usable area in square meters. Optional; used by the impossible-data fraud rule. */
+    @Column(name = "area_sqm")
+    private Integer areaSqm;
+
+    // How the offered space is arranged (entire place / private room / shared room). With-property only.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_arrangement")
+    private RoomArrangement roomArrangement;
+
     @Column(name = "is_owner")
     private Boolean owner;
 
@@ -169,6 +178,10 @@ public class RoommateListing {
     @Column(name = "employment_status")
     private JobStatus employmentStatus;
 
+    // Whether the lister has children. Part of the lifestyle info shown for listers without a property.
+    @Column(name = "has_children")
+    private Boolean hasChildren;
+
     @Lob
     @Column(name = "about_me", columnDefinition = "TEXT")
     private String aboutMe;
@@ -185,6 +198,13 @@ public class RoommateListing {
 
     @Embedded
     private PromotionState promotionState = new PromotionState();
+
+    /**
+     * Monotonically increasing counter bumped on every content mutation (edit or photo change).
+     * Recorded by the risk engine to guard against publishing stale content.
+     */
+    @Column(name = "content_revision", nullable = false)
+    private long contentRevision = 0L;
 
     @PrePersist
     public void onCreate() {

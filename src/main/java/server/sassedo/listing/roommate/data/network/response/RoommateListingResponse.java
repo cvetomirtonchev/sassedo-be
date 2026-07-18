@@ -52,6 +52,8 @@ public class RoommateListingResponse implements EngagementAware {
     private boolean availableAsap;
     private Integer bedrooms;
     private Integer bathrooms;
+    private Integer areaSqm;
+    private RoomArrangement roomArrangement;
     private Boolean owner;
 
     private Set<Utility> includedUtilities;
@@ -70,6 +72,7 @@ public class RoommateListingResponse implements EngagementAware {
     private Integer peopleInProperty;
     private Set<Language> spokenLanguages;
     private JobStatus employmentStatus;
+    private Boolean hasChildren;
     private String aboutMe;
 
     private String title;

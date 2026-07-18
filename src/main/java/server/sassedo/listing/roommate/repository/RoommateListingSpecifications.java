@@ -7,6 +7,7 @@ import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingStatus;
+import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.RoomAmenity;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 
@@ -88,6 +89,58 @@ public final class RoommateListingSpecifications {
                     sub.where(cb.and(cb.equal(subRoot.get("id"), root.get("id")), cb.equal(am, amenity)));
                     predicates.add(cb.exists(sub));
                 }
+            }
+            // Age-range overlap against the listing's accepted age window. A missing bound on the
+            // listing side means "open", so it never excludes a listing.
+            if (f.getAgeMin() != null) {
+                predicates.add(cb.or(
+                        cb.isNull(root.get("ageMax")),
+                        cb.greaterThanOrEqualTo(root.get("ageMax"), f.getAgeMin())));
+            }
+            if (f.getAgeMax() != null) {
+                predicates.add(cb.or(
+                        cb.isNull(root.get("ageMin")),
+                        cb.lessThanOrEqualTo(root.get("ageMin"), f.getAgeMax())));
+            }
+            // A listing with no gender preference (null) accepts anyone, so it always matches.
+            if (f.getPreferredSex() != null) {
+                predicates.add(cb.or(
+                        cb.isNull(root.get("preferredSex")),
+                        cb.equal(root.get("preferredSex"), f.getPreferredSex())));
+            }
+            // Pets: with-property listings expose petsAllowed; without-property listers use petPolicy.
+            if (f.getPetsAllowed() != null) {
+                if (withoutProperty) {
+                    if (Boolean.TRUE.equals(f.getPetsAllowed())) {
+                        predicates.add(cb.and(
+                                cb.isNotNull(root.get("petPolicy")),
+                                cb.notEqual(root.get("petPolicy"), PetPolicy.NOT_ALLOWED)));
+                    } else {
+                        predicates.add(cb.equal(root.get("petPolicy"), PetPolicy.NOT_ALLOWED));
+                    }
+                } else {
+                    predicates.add(cb.equal(root.get("petsAllowed"), f.getPetsAllowed()));
+                }
+            }
+            if (f.getSmokingPreference() != null) {
+                predicates.add(cb.equal(root.get("smokingPreference"), f.getSmokingPreference()));
+            }
+            if (f.getEmploymentStatus() != null) {
+                predicates.add(cb.equal(root.get("employmentStatus"), f.getEmploymentStatus()));
+            }
+            if (f.getSpokenLanguages() != null && !f.getSpokenLanguages().isEmpty()) {
+                Subquery<Long> sub = query.subquery(Long.class);
+                Root<RoommateListing> subRoot = sub.from(RoommateListing.class);
+                Join<Object, Object> langs = subRoot.join("spokenLanguages");
+                sub.select(subRoot.get("id"));
+                sub.where(cb.and(cb.equal(subRoot.get("id"), root.get("id")), langs.in(f.getSpokenLanguages())));
+                predicates.add(cb.exists(sub));
+            }
+            if (f.getRoomArrangement() != null) {
+                predicates.add(cb.equal(root.get("roomArrangement"), f.getRoomArrangement()));
+            }
+            if (f.getHasChildren() != null) {
+                predicates.add(cb.equal(root.get("hasChildren"), f.getHasChildren()));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
