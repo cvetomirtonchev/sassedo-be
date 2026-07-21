@@ -4,7 +4,12 @@ services:
   mysql:
     image: mysql:8.4
     restart: unless-stopped
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-time-zone=+00:00
+    # Tuned for a small (~2 GiB) host: disable performance_schema (large fixed
+    # memory cost), cap connections, and keep the InnoDB buffer pool modest.
+    command: >-
+      --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-time-zone=+00:00
+      --performance_schema=OFF --max_connections=60 --innodb_buffer_pool_size=128M --table_open_cache=200
+    mem_limit: 600m
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-sassedodb}
       MYSQL_USER: ${MYSQL_USER:?set MYSQL_USER in .env}
@@ -27,6 +32,10 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    # Hard cap so the JVM + native/off-heap memory cannot starve the host.
+    # Pair with -Xmx in JAVA_OPTS; memswap_limit allows a little swap headroom.
+    mem_limit: 950m
+    memswap_limit: 1450m
     depends_on:
       mysql:
         condition: service_healthy

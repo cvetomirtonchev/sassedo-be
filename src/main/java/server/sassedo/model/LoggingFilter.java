@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.ContentCachingResponseWrapper;
@@ -26,21 +27,58 @@ public class LoggingFilter implements Filter {
      */
     private static final int REQUEST_CONTENT_CACHE_LIMIT = 16 * 1024;
 
+    /**
+     * When {@code false} (the production default) the filter does not log successful requests and
+     * never buffers request bodies on the hot path; it only records a concise line for error
+     * responses (HTTP status >= 400). Buffering + masking + multi-line logging on every request is
+     * expensive under traffic floods, so keep verbose logging off outside of debugging.
+     */
+    @Value("${sassedo.logging.requests.verbose:false}")
+    private boolean verboseRequestLogging;
+
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
 
+        if (verboseRequestLogging) {
+            doFilterVerbose(req, res, chain);
+            return;
+        }
+
+        // Production default: wrap only the response (cheap) so we can surface error bodies,
+        // but skip request-body buffering/masking and per-request success logging entirely.
+        ContentCachingResponseWrapper wrappedResponse = new ContentCachingResponseWrapper(res);
+        try {
+            chain.doFilter(req, wrappedResponse);
+        } finally {
+            int status = wrappedResponse.getStatus();
+            if (status >= 400) {
+                String uri = req.getRequestURI();
+                String queryString = req.getQueryString();
+                if (queryString != null) {
+                    uri += "?" + queryString;
+                }
+                String responseBody = new String(wrappedResponse.getContentAsByteArray(), StandardCharsets.UTF_8);
+                logger.info("{} {} -> {} {}", req.getMethod(), uri, status, responseBody);
+            }
+            wrappedResponse.copyBodyToResponse();
+        }
+    }
+
+    private void doFilterVerbose(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
+            throws IOException, ServletException {
         ContentCachingRequestWrapper wrappedRequest = new ContentCachingRequestWrapper(req, REQUEST_CONTENT_CACHE_LIMIT);
         ContentCachingResponseWrapper wrappedResponse = new ContentCachingResponseWrapper(res);
 
-        chain.doFilter(wrappedRequest, wrappedResponse);
-
-        String requestBody = getRequestBody(wrappedRequest);
-        logRequest(wrappedRequest, requestBody);
-        logResponse(wrappedResponse);
-
-        wrappedResponse.copyBodyToResponse();
+        try {
+            chain.doFilter(wrappedRequest, wrappedResponse);
+        } finally {
+            String requestBody = getRequestBody(wrappedRequest);
+            logRequest(wrappedRequest, requestBody);
+            logResponse(wrappedResponse);
+            wrappedResponse.copyBodyToResponse();
+        }
     }
 
     private String getRequestBody(ContentCachingRequestWrapper request) {
