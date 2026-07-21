@@ -103,11 +103,11 @@ run `deploy/init-letsencrypt.sh` in this mode.
    docker compose -f compose.yaml -f compose.ip.yaml up -d --build
    ```
 
-4. Verify over HTTP using the public IP (example `3.121.162.2`):
+4. Verify over HTTP using the public IP (example `51.102.125.219`):
 
    ```bash
-   curl -I http://3.121.162.2
-   curl http://3.121.162.2/api/faq/all
+   curl -I http://51.102.125.219
+   curl http://51.102.125.219/api/faq/all
    ```
 
 Because traffic is unencrypted, treat this as temporary. Switch to the domain + TLS flow below
