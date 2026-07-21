@@ -34,8 +34,9 @@ services:
     restart: unless-stopped
     # Hard cap so the JVM + native/off-heap memory cannot starve the host.
     # Pair with -Xmx in JAVA_OPTS; memswap_limit allows a little swap headroom.
-    mem_limit: 950m
-    memswap_limit: 1450m
+    # Sized for -Xmx768m plus metaspace/thread-stack/native overhead (~360m).
+    mem_limit: 1152m
+    memswap_limit: 1664m
     depends_on:
       mysql:
         condition: service_healthy
