@@ -12,6 +12,7 @@ import server.sassedo.user.data.network.request.UpdateProfileRequest;
 import server.sassedo.user.data.network.request.UpdateUserPreferencesRequest;
 import server.sassedo.user.data.network.request.UpdateUserRoleRequest;
 import server.sassedo.user.data.network.request.VerifyUserRequest;
+import server.sassedo.user.data.projection.UserParticipantSummary;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,13 @@ public interface UserService {
     void validatePasswordResetToken(String otp, String email) throws GenericException;
 
     User getUserById(Long id) throws GenericException;
+
+    /**
+     * Lightweight owner/participant summary (id, name, hasPhoto) that never loads the profile-photo
+     * blob. Returns {@code null} when the user does not exist. Used to enrich listing responses
+     * without pulling image bytes into heap for every card.
+     */
+    UserParticipantSummary getUserSummary(Long id);
 
     User getUserByEmail(String email) throws GenericException;
 

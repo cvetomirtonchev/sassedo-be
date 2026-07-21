@@ -8,8 +8,8 @@ import server.sassedo.listing.rental.data.network.response.RentalListingResponse
 import server.sassedo.listing.rental.matching.RentalMatchScorer;
 import server.sassedo.listing.rental.repository.RentalListingPhotoRepository;
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
-import server.sassedo.model.GenericException;
 import server.sassedo.user.data.dto.User;
+import server.sassedo.user.data.projection.UserParticipantSummary;
 import server.sassedo.user.service.user.UserService;
 
 import java.util.List;
@@ -111,19 +111,21 @@ public class RentalListingMapper {
         if (ownerId == null) {
             return;
         }
-        try {
-            User owner = userService.getUserById(ownerId);
-            response.setOwnerName(owner.getName());
-            if (owner.getProfilePhoto() != null && owner.getProfilePhoto().length > 0) {
-                String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
-                        .path("/api/user/")
-                        .path(String.valueOf(ownerId))
-                        .path("/picture")
-                        .toUriString();
-                response.setOwnerPhotoUrl(photoUrl);
-            }
-        } catch (GenericException ignored) {
-            // owner missing; leave owner fields null
+        // Use a blob-free summary (id/name/hasPhoto) instead of loading the full owner entity:
+        // loading the owner per card would pull the profile-photo MEDIUMBLOB into heap for every
+        // listing in a page and exhaust memory under load.
+        UserParticipantSummary owner = userService.getUserSummary(ownerId);
+        if (owner == null) {
+            return;
+        }
+        response.setOwnerName(owner.getName());
+        if (owner.getHasPhoto()) {
+            String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/api/user/")
+                    .path(String.valueOf(ownerId))
+                    .path("/picture")
+                    .toUriString();
+            response.setOwnerPhotoUrl(photoUrl);
         }
     }
 }

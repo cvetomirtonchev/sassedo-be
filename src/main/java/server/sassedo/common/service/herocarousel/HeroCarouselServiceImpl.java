@@ -15,6 +15,7 @@ import server.sassedo.common.repository.HeroSlideImageRepository;
 import server.sassedo.common.repository.HeroSlideRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
+import server.sassedo.utils.ImageProcessor;
 import server.sassedo.utils.ImageUploadValidator;
 
 import java.io.IOException;
@@ -156,9 +157,11 @@ public class HeroCarouselServiceImpl implements HeroCarouselService {
         }
         ImageUploadValidator.validate(file);
 
+        ImageProcessor.ProcessedImage processed = ImageProcessor.process(
+                file.getBytes(), file.getContentType(), ImageProcessor.Preset.HERO);
         HeroSlideImage image = new HeroSlideImage();
-        image.setData(file.getBytes());
-        image.setContentType(file.getContentType());
+        image.setData(processed.data());
+        image.setContentType(processed.contentType());
         image = heroSlideImageRepository.save(image);
 
         Long previousImageId = slide.getBackgroundImageId();

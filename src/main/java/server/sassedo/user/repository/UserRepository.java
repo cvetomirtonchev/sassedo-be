@@ -11,6 +11,7 @@ import server.sassedo.user.data.projection.UserParticipantSummary;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -34,4 +35,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "CASE WHEN u.profilePhoto IS NOT NULL THEN true ELSE false END AS hasPhoto " +
             "FROM User u WHERE u.id IN :ids")
     List<UserParticipantSummary> findParticipantSummariesByIdIn(@Param("ids") Collection<Long> ids);
+
+    /**
+     * Single lightweight summary (id/name/hasPhoto) for listing-owner enrichment. Like
+     * {@link #findParticipantSummariesByIdIn} it deliberately never selects the {@code profilePhoto}
+     * MEDIUMBLOB, so enriching a page of listing cards does not pull owner image bytes into heap.
+     */
+    @Query("SELECT u.id AS id, u.name AS name, " +
+            "CASE WHEN u.profilePhoto IS NOT NULL THEN true ELSE false END AS hasPhoto " +
+            "FROM User u WHERE u.id = :id")
+    Optional<UserParticipantSummary> findSummaryById(@Param("id") Long id);
 }

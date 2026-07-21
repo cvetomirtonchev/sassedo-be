@@ -14,12 +14,14 @@ import server.sassedo.location.repository.CityRepository;
 import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
+import server.sassedo.utils.ImageProcessor;
 import server.sassedo.utils.ImageUploadValidator;
 import server.sassedo.user.data.dto.ERole;
 import server.sassedo.user.data.dto.PasswordResetToken;
 import server.sassedo.user.data.dto.Role;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.data.dto.UserPreferencesDto;
+import server.sassedo.user.data.projection.UserParticipantSummary;
 import server.sassedo.user.data.network.UpdateUserRequest;
 import server.sassedo.user.data.network.request.*;
 import server.sassedo.user.repository.PasswordTokenRepository;
@@ -156,6 +158,14 @@ public class UserServiceImpl implements UserService {
             throw new GenericException(GenericExceptionCode.USER_NOT_FOUND, "User not found");
         }
         return user;
+    }
+
+    @Override
+    public UserParticipantSummary getUserSummary(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return userRepository.findSummaryById(id).orElse(null);
     }
 
     @Override
@@ -415,7 +425,9 @@ public class UserServiceImpl implements UserService {
             throw new GenericException(GenericExceptionCode.INVALID_FILE, "No file provided");
         }
         ImageUploadValidator.validate(file);
-        user.setProfilePhoto(file.getBytes());
+        ImageProcessor.ProcessedImage processed = ImageProcessor.process(
+                file.getBytes(), file.getContentType(), ImageProcessor.Preset.PROFILE);
+        user.setProfilePhoto(processed.data());
         return userRepository.save(user);
     }
 

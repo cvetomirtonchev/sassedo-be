@@ -2,10 +2,12 @@ package server.sassedo.location.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import server.sassedo.utils.ImageResponses;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
 import server.sassedo.location.data.network.request.AddCityRequest;
@@ -60,13 +62,11 @@ public class CountryController {
     }
 
     @GetMapping("/cities/{id}/image")
-    public ResponseEntity<byte[]> getCityImage(@PathVariable Long id) {
+    public ResponseEntity<byte[]> getCityImage(@PathVariable Long id,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         try {
             City city = cityService.getById(id);
             byte[] data = city.getImage();
-            if (data == null || data.length == 0) {
-                return ResponseEntity.notFound().build();
-            }
             MediaType mediaType = MediaType.IMAGE_JPEG;
             if (city.getImageContentType() != null) {
                 try {
@@ -75,7 +75,7 @@ public class CountryController {
                     // fall back to jpeg
                 }
             }
-            return ResponseEntity.ok().contentType(mediaType).body(data);
+            return ImageResponses.cached(data, mediaType, ifNoneMatch);
         } catch (GenericException e) {
             return ResponseEntity.notFound().build();
         }

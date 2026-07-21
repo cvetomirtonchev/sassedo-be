@@ -16,6 +16,7 @@ import server.sassedo.blog.repository.BlogImageRepository;
 import server.sassedo.blog.repository.BlogPostRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
+import server.sassedo.utils.ImageProcessor;
 import server.sassedo.utils.ImageUploadValidator;
 
 import java.io.IOException;
@@ -105,9 +106,11 @@ public class BlogServiceImpl implements BlogService {
             throw new GenericException(GenericExceptionCode.INVALID_FILE, "Uploaded file is empty");
         }
         ImageUploadValidator.validate(file);
+        ImageProcessor.ProcessedImage processed = ImageProcessor.process(
+                file.getBytes(), file.getContentType(), ImageProcessor.Preset.BLOG);
         BlogImage image = new BlogImage();
-        image.setData(file.getBytes());
-        image.setContentType(file.getContentType());
+        image.setData(processed.data());
+        image.setContentType(processed.contentType());
         return blogImageRepository.save(image);
     }
 

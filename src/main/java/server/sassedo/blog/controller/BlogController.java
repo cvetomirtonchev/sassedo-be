@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,7 @@ import server.sassedo.common.data.network.response.PageMeta;
 import server.sassedo.common.data.network.response.PagedResponse;
 import server.sassedo.model.GenericException;
 import server.sassedo.security.jwt.JwtUtils;
+import server.sassedo.utils.ImageResponses;
 
 import java.io.IOException;
 
@@ -44,9 +46,10 @@ public class BlogController {
     }
 
     @GetMapping("/images/{imageId}")
-    public ResponseEntity<byte[]> getImage(@PathVariable Long imageId) {
+    public ResponseEntity<byte[]> getImage(@PathVariable Long imageId,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         try {
-            return imageResponse(blogService.getImage(imageId));
+            return imageResponse(blogService.getImage(imageId), ifNoneMatch);
         } catch (GenericException e) {
             return ResponseEntity.notFound().build();
         }
@@ -129,7 +132,7 @@ public class BlogController {
                 new PageMeta(posts.getNumber(), posts.getTotalPages(), posts.getTotalElements()));
     }
 
-    private ResponseEntity<byte[]> imageResponse(BlogImage image) {
+    private ResponseEntity<byte[]> imageResponse(BlogImage image, String ifNoneMatch) {
         if (image.getData() == null || image.getData().length == 0) {
             return ResponseEntity.notFound().build();
         }
@@ -141,6 +144,6 @@ public class BlogController {
                 // fall back to jpeg
             }
         }
-        return ResponseEntity.ok().contentType(mediaType).body(image.getData());
+        return ImageResponses.cached(image.getData(), mediaType, ifNoneMatch);
     }
 }

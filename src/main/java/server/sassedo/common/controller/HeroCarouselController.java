@@ -2,6 +2,7 @@ package server.sassedo.common.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +23,7 @@ import server.sassedo.common.data.network.response.HeroSlideImageUploadResponse;
 import server.sassedo.common.data.network.response.HeroSlidePublicResponse;
 import server.sassedo.common.service.herocarousel.HeroCarouselService;
 import server.sassedo.model.GenericException;
+import server.sassedo.utils.ImageResponses;
 
 import java.io.IOException;
 import java.util.List;
@@ -50,9 +52,10 @@ public class HeroCarouselController {
     }
 
     @GetMapping("/images/{imageId}")
-    public ResponseEntity<byte[]> getImage(@PathVariable Long imageId) {
+    public ResponseEntity<byte[]> getImage(@PathVariable Long imageId,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         try {
-            return imageResponse(heroCarouselService.getImage(imageId));
+            return imageResponse(heroCarouselService.getImage(imageId), ifNoneMatch);
         } catch (GenericException e) {
             return ResponseEntity.notFound().build();
         }
@@ -189,7 +192,7 @@ public class HeroCarouselController {
                 .toUriString();
     }
 
-    private ResponseEntity<byte[]> imageResponse(HeroSlideImage image) {
+    private ResponseEntity<byte[]> imageResponse(HeroSlideImage image, String ifNoneMatch) {
         if (image.getData() == null || image.getData().length == 0) {
             return ResponseEntity.notFound().build();
         }
@@ -201,6 +204,6 @@ public class HeroCarouselController {
                 // fall back to jpeg
             }
         }
-        return ResponseEntity.ok().contentType(mediaType).body(image.getData());
+        return ImageResponses.cached(image.getData(), mediaType, ifNoneMatch);
     }
 }

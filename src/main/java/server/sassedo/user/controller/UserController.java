@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -29,6 +30,7 @@ import server.sassedo.user.data.network.request.UpdateUserRoleRequest;
 import server.sassedo.user.data.network.response.UserResponse;
 import server.sassedo.user.data.network.response.UserRolesResponse;
 import server.sassedo.user.service.user.UserService;
+import server.sassedo.utils.ImageResponses;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -107,15 +109,11 @@ public class UserController {
     }
 
     @GetMapping("/{id}/picture")
-    public ResponseEntity<byte[]> getProfilePicture(@PathVariable Long id) {
+    public ResponseEntity<byte[]> getProfilePicture(@PathVariable Long id,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         try {
             byte[] image = userService.getProfilePhoto(id);
-            if (image == null || image.length == 0) {
-                return ResponseEntity.notFound().build();
-            }
-            return ResponseEntity.ok()
-                    .contentType(MediaType.IMAGE_JPEG)
-                    .body(image);
+            return ImageResponses.cached(image, MediaType.IMAGE_JPEG, ifNoneMatch);
         } catch (GenericException e) {
             return ResponseEntity.notFound().build();
         }

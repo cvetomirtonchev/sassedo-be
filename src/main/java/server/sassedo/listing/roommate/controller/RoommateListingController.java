@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -38,6 +39,7 @@ import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Sex;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.service.user.UserService;
+import server.sassedo.utils.ImageResponses;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -309,20 +311,22 @@ public class RoommateListingController {
     }
 
     @GetMapping("/{id}/picture")
-    public ResponseEntity<byte[]> getMainPicture(@PathVariable Long id) {
+    public ResponseEntity<byte[]> getMainPicture(@PathVariable Long id,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         try {
             RoommateListingPhoto photo = listingService.getMainPhoto(id);
-            return photoResponse(photo);
+            return photoResponse(photo, ifNoneMatch);
         } catch (GenericException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
     @GetMapping("/photos/{photoId}")
-    public ResponseEntity<byte[]> getPhoto(@PathVariable Long photoId) {
+    public ResponseEntity<byte[]> getPhoto(@PathVariable Long photoId,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         try {
             RoommateListingPhoto photo = listingService.getPhoto(photoId);
-            return photoResponse(photo);
+            return photoResponse(photo, ifNoneMatch);
         } catch (GenericException e) {
             return ResponseEntity.notFound().build();
         }
@@ -375,7 +379,7 @@ public class RoommateListingController {
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 
-    private ResponseEntity<byte[]> photoResponse(RoommateListingPhoto photo) {
+    private ResponseEntity<byte[]> photoResponse(RoommateListingPhoto photo, String ifNoneMatch) {
         if (photo.getData() == null || photo.getData().length == 0) {
             return ResponseEntity.notFound().build();
         }
@@ -387,7 +391,7 @@ public class RoommateListingController {
                 // fall back to jpeg
             }
         }
-        return ResponseEntity.ok().contentType(mediaType).body(photo.getData());
+        return ImageResponses.cached(photo.getData(), mediaType, ifNoneMatch);
     }
 
     private PagedResponse<RoommateListingResponse> toPagedResponse(Page<RoommateListing> listings) {
