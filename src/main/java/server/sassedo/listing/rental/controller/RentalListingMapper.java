@@ -6,6 +6,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import server.sassedo.listing.rental.data.dto.RentalListing;
 import server.sassedo.listing.rental.data.network.response.RentalListingResponse;
 import server.sassedo.listing.rental.matching.RentalMatchScorer;
+import server.sassedo.listing.rental.repository.RentalListingPhotoRepository;
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
 import server.sassedo.model.GenericException;
 import server.sassedo.user.data.dto.User;
@@ -24,6 +25,7 @@ public class RentalListingMapper {
 
     private final UserService userService;
     private final RentalMatchScorer matchScorer;
+    private final RentalListingPhotoRepository photoRepository;
 
     public RentalListingResponse map(RentalListing listing) {
         return map(listing, null);
@@ -80,7 +82,9 @@ public class RentalListingMapper {
             r.setPinned(listing.getPromotionState().isPinned());
         }
 
-        List<ListingPhotoResponse> photos = listing.getPhotos().stream()
+        // Read only photo id + main flag; loading listing.getPhotos() would pull every image
+        // MEDIUMBLOB into heap and exhaust memory on list endpoints.
+        List<ListingPhotoResponse> photos = photoRepository.findMetaByListingId(listing.getId()).stream()
                 .map(p -> new ListingPhotoResponse(p.getId(), buildPhotoUrl(p.getId()), p.isMain()))
                 .collect(Collectors.toList());
         r.setPhotos(photos);

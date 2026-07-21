@@ -7,6 +7,7 @@ import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
 import server.sassedo.listing.roommate.data.network.response.RoommateListingResponse;
 import server.sassedo.listing.roommate.matching.RoommateMatchScorer;
+import server.sassedo.listing.roommate.repository.RoommateListingPhotoRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.service.user.UserService;
@@ -24,6 +25,7 @@ public class RoommateListingMapper {
 
     private final UserService userService;
     private final RoommateMatchScorer matchScorer;
+    private final RoommateListingPhotoRepository photoRepository;
 
     public RoommateListingResponse map(RoommateListing listing) {
         return map(listing, null);
@@ -98,7 +100,9 @@ public class RoommateListingMapper {
             r.setPinned(listing.getPromotionState().isPinned());
         }
 
-        List<ListingPhotoResponse> photos = listing.getPhotos().stream()
+        // Read only photo id + main flag; loading listing.getPhotos() would pull every image
+        // MEDIUMBLOB into heap and exhaust memory on list endpoints.
+        List<ListingPhotoResponse> photos = photoRepository.findMetaByListingId(listing.getId()).stream()
                 .map(p -> new ListingPhotoResponse(p.getId(), buildPhotoUrl(p.getId()), p.isMain()))
                 .collect(Collectors.toList());
         r.setPhotos(photos);
