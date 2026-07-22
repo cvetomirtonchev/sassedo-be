@@ -63,9 +63,6 @@ public class Promotion {
     @Column(name = "purchase_id")
     private Long purchaseId;
 
-    @Column(nullable = false)
-    private boolean pinned = false;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

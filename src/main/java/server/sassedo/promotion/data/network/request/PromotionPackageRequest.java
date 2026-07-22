@@ -14,7 +14,11 @@ public class PromotionPackageRequest {
 
     @NotBlank
     @Size(max = 120)
-    private String name;
+    private String nameEn;
+
+    @NotBlank
+    @Size(max = 120)
+    private String nameBg;
 
     @Size(max = 500)
     private String description;
@@ -32,8 +36,6 @@ public class PromotionPackageRequest {
     private String currency = "EUR";
 
     private int sortPriority = 0;
-
-    private boolean pinnable = false;
 
     private Boolean active;
 }

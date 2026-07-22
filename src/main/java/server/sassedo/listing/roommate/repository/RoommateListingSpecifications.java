@@ -1,5 +1,7 @@
 package server.sassedo.listing.roommate.repository;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -11,6 +13,7 @@ import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.RoomAmenity;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,15 +41,12 @@ public final class RoommateListingSpecifications {
             }
             // Filter by has-property mode. A null column value predates this feature and is treated
             // as "has property" (true).
-            boolean withoutProperty = Boolean.FALSE.equals(f.getHasProperty());
+            Predicate rowWithProperty = cb.or(
+                    cb.equal(root.get("hasProperty"), Boolean.TRUE),
+                    cb.isNull(root.get("hasProperty")));
+            Predicate rowWithoutProperty = cb.equal(root.get("hasProperty"), Boolean.FALSE);
             if (f.getHasProperty() != null) {
-                if (withoutProperty) {
-                    predicates.add(cb.equal(root.get("hasProperty"), Boolean.FALSE));
-                } else {
-                    predicates.add(cb.or(
-                            cb.equal(root.get("hasProperty"), Boolean.TRUE),
-                            cb.isNull(root.get("hasProperty"))));
-                }
+                predicates.add(Boolean.FALSE.equals(f.getHasProperty()) ? rowWithoutProperty : rowWithProperty);
             }
             if (f.getPropertyType() != null) {
                 predicates.add(cb.equal(root.get("propertyType"), f.getPropertyType()));
@@ -55,13 +55,13 @@ public final class RoommateListingSpecifications {
                 predicates.add(cb.like(cb.lower(root.get("neighborhood")),
                         "%" + f.getNeighborhood().toLowerCase() + "%"));
             }
-            // For listers without a property the price filter targets their budget; otherwise rent.
-            String priceField = withoutProperty ? "budget" : "rent";
-            if (f.getMinPrice() != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get(priceField), f.getMinPrice()));
-            }
-            if (f.getMaxPrice() != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get(priceField), f.getMaxPrice()));
+            // Price is row-aware: listers without a property expose their budget, everyone else the
+            // rent. Evaluating per row (not per filter mode) keeps the "all" browse correct when
+            // with- and without-property listings are mixed together.
+            if (f.getMinPrice() != null || f.getMaxPrice() != null) {
+                predicates.add(cb.or(
+                        cb.and(rowWithProperty, priceInRange(cb, root.get("rent"), f.getMinPrice(), f.getMaxPrice())),
+                        cb.and(rowWithoutProperty, priceInRange(cb, root.get("budget"), f.getMinPrice(), f.getMaxPrice()))));
             }
             if (f.getAvailableBy() != null) {
                 Predicate asap = cb.isTrue(root.get("availableAsap"));
@@ -70,11 +70,27 @@ public final class RoommateListingSpecifications {
                         cb.lessThanOrEqualTo(root.get("availableFrom"), f.getAvailableBy()));
                 predicates.add(cb.or(asap, byDate));
             }
+            if (Boolean.TRUE.equals(f.getAvailableAsap())) {
+                predicates.add(cb.isTrue(root.get("availableAsap")));
+            }
             if (f.getMinBedrooms() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("bedrooms"), f.getMinBedrooms()));
             }
             if (f.getMinBathrooms() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("bathrooms"), f.getMinBathrooms()));
+            }
+            // Shared bedroom/bathroom willingness: only filters when the searcher is NOT willing to
+            // share (value false), excluding listings whose offered room/bath is shared. A null
+            // column is treated as not shared.
+            if (Boolean.FALSE.equals(f.getSharedBedroom())) {
+                predicates.add(cb.or(
+                        cb.isNull(root.get("sharedBedroom")),
+                        cb.isFalse(root.get("sharedBedroom"))));
+            }
+            if (Boolean.FALSE.equals(f.getSharedBathroom())) {
+                predicates.add(cb.or(
+                        cb.isNull(root.get("sharedBathroom")),
+                        cb.isFalse(root.get("sharedBathroom"))));
             }
             if (f.getAmenities() != null && !f.getAmenities().isEmpty()) {
                 for (String raw : f.getAmenities()) {
@@ -108,19 +124,24 @@ public final class RoommateListingSpecifications {
                         cb.isNull(root.get("preferredSex")),
                         cb.equal(root.get("preferredSex"), f.getPreferredSex())));
             }
-            // Pets: with-property listings expose petsAllowed; without-property listers use petPolicy.
+            // Pets are row-aware: with-property listings expose the petsAllowed flag, while
+            // without-property listers describe what they accept via petPolicy. Deciding per row
+            // (rather than per filter mode) keeps the "all" browse correct for mixed results.
             if (f.getPetsAllowed() != null) {
-                if (withoutProperty) {
-                    if (Boolean.TRUE.equals(f.getPetsAllowed())) {
-                        predicates.add(cb.and(
-                                cb.isNotNull(root.get("petPolicy")),
-                                cb.notEqual(root.get("petPolicy"), PetPolicy.NOT_ALLOWED)));
-                    } else {
-                        predicates.add(cb.equal(root.get("petPolicy"), PetPolicy.NOT_ALLOWED));
-                    }
+                Predicate withPropertyPets;
+                Predicate withoutPropertyPets;
+                if (Boolean.TRUE.equals(f.getPetsAllowed())) {
+                    withPropertyPets = cb.isTrue(root.get("petsAllowed"));
+                    withoutPropertyPets = cb.and(
+                            cb.isNotNull(root.get("petPolicy")),
+                            cb.notEqual(root.get("petPolicy"), PetPolicy.NOT_ALLOWED));
                 } else {
-                    predicates.add(cb.equal(root.get("petsAllowed"), f.getPetsAllowed()));
+                    withPropertyPets = cb.isFalse(root.get("petsAllowed"));
+                    withoutPropertyPets = cb.equal(root.get("petPolicy"), PetPolicy.NOT_ALLOWED);
                 }
+                predicates.add(cb.or(
+                        cb.and(rowWithProperty, withPropertyPets),
+                        cb.and(rowWithoutProperty, withoutPropertyPets)));
             }
             if (f.getSmokingPreference() != null) {
                 predicates.add(cb.equal(root.get("smokingPreference"), f.getSmokingPreference()));
@@ -145,6 +166,18 @@ public final class RoommateListingSpecifications {
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    private static Predicate priceInRange(CriteriaBuilder cb, Expression<BigDecimal> field,
+                                          BigDecimal min, BigDecimal max) {
+        List<Predicate> bounds = new ArrayList<>();
+        if (min != null) {
+            bounds.add(cb.greaterThanOrEqualTo(field, min));
+        }
+        if (max != null) {
+            bounds.add(cb.lessThanOrEqualTo(field, max));
+        }
+        return cb.and(bounds.toArray(new Predicate[0]));
     }
 
     private static RoomAmenity parse(String raw) {

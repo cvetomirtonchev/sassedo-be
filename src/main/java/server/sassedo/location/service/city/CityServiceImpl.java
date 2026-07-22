@@ -6,7 +6,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import server.sassedo.listing.rental.repository.RentalListingRepository;
 import server.sassedo.listing.roommate.repository.RoommateListingRepository;
-import server.sassedo.listing.search.repository.ApartmentSearchRepository;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
 import server.sassedo.location.data.network.request.AddCityRequest;
@@ -33,7 +32,6 @@ public class CityServiceImpl implements CityService {
     private final CountryRepository countryRepository;
     private final RentalListingRepository rentalListingRepository;
     private final RoommateListingRepository roommateListingRepository;
-    private final ApartmentSearchRepository apartmentSearchRepository;
 
     @Override
     public List<City> getByCountryId(Long countryId) throws GenericException {
@@ -92,7 +90,6 @@ public class CityServiceImpl implements CityService {
         Map<Long, Long> counts = new HashMap<>();
         accumulate(counts, rentalListingRepository.countActiveByCity());
         accumulate(counts, roommateListingRepository.countActiveByCity());
-        accumulate(counts, apartmentSearchRepository.countActiveByCity());
 
         return cityRepository.findAll().stream()
                 .map(city -> new CityWithCount(city, counts.getOrDefault(city.getId(), 0L)))

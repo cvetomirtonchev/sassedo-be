@@ -22,6 +22,8 @@ import server.sassedo.location.repository.CityRepository;
 import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
+import server.sassedo.promotion.common.ListingType;
+import server.sassedo.promotion.service.PromotionService;
 import server.sassedo.utils.ImageProcessor;
 import server.sassedo.utils.ImageUploadValidator;
 
@@ -39,6 +41,7 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     private final RoommateListingPhotoRepository photoRepository;
     private final CountryRepository countryRepository;
     private final CityRepository cityRepository;
+    private final PromotionService promotionService;
 
     @Value("${sassedo.listings.ttl-days:30}")
     private long listingTtlDays;
@@ -135,7 +138,12 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         if (status == ListingStatus.ACTIVE) {
             listing.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
         }
-        return listingRepository.save(listing);
+        RoommateListing saved = listingRepository.save(listing);
+        if (status == ListingStatus.ACTIVE) {
+            // Start any promotion that was paid for while the listing awaited approval.
+            promotionService.activateDeferredForListing(ListingType.ROOMMATE, id);
+        }
+        return saved;
     }
 
     @Override
@@ -178,6 +186,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     @Transactional
     public void delete(Long id) throws GenericException {
         RoommateListing listing = getById(id);
+        // Release any promotion awaiting approval so it is not left blocking / orphaned.
+        promotionService.cancelDeferredForListing(ListingType.ROOMMATE, id);
         listingRepository.delete(listing);
     }
 
@@ -277,6 +287,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         listing.setAvailableAsap(request.isAvailableAsap());
         listing.setBedrooms(request.getBedrooms());
         listing.setBathrooms(request.getBathrooms());
+        listing.setSharedBedroom(request.getSharedBedroom());
+        listing.setSharedBathroom(request.getSharedBathroom());
         listing.setAreaSqm(request.getAreaSqm());
         listing.setRoomArrangement(request.getRoomArrangement());
         listing.setOwner(request.getOwner());
@@ -303,10 +315,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         listing.setAgeMin(request.getAgeMin());
         listing.setAgeMax(request.getAgeMax());
         listing.setSmokingPreference(request.getSmokingPreference());
-        listing.setOccupationPreference(request.getOccupationPreference());
         listing.setAdditionalRequirements(request.getAdditionalRequirements());
         listing.setPetPolicy(request.getPetPolicy());
-        listing.setPeopleInProperty(request.getPeopleInProperty());
         listing.getSpokenLanguages().clear();
         if (request.getSpokenLanguages() != null) {
             listing.getSpokenLanguages().addAll(request.getSpokenLanguages());
@@ -353,6 +363,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         listing.setAvailableAsap(request.isAvailableAsap());
         listing.setBedrooms(null);
         listing.setBathrooms(null);
+        listing.setSharedBedroom(null);
+        listing.setSharedBathroom(null);
         listing.setAreaSqm(null);
         listing.setRoomArrangement(null);
         listing.setOwner(null);
@@ -367,10 +379,8 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         listing.setAgeMin(request.getAgeMin());
         listing.setAgeMax(request.getAgeMax());
         listing.setSmokingPreference(request.getSmokingPreference());
-        listing.setOccupationPreference(request.getOccupationPreference());
         listing.setAdditionalRequirements(request.getAdditionalRequirements());
         listing.setPetPolicy(request.getPetPolicy());
-        listing.setPeopleInProperty(request.getPeopleInProperty());
         listing.getSpokenLanguages().clear();
         if (request.getSpokenLanguages() != null) {
             listing.getSpokenLanguages().addAll(request.getSpokenLanguages());

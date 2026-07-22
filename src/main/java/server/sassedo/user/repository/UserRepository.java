@@ -6,7 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.User;
+import server.sassedo.user.data.projection.PublicProfileView;
 import server.sassedo.user.data.projection.UserParticipantSummary;
 
 import java.util.Collection;
@@ -45,4 +47,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "CASE WHEN u.profilePhoto IS NOT NULL THEN true ELSE false END AS hasPhoto " +
             "FROM User u WHERE u.id = :id")
     Optional<UserParticipantSummary> findSummaryById(@Param("id") Long id);
+
+    /**
+     * Publicly shareable profile attributes for a listing owner, surfaced on the roommate detail
+     * page. Deliberately selects only safe scalar fields and never the {@code profilePhoto}
+     * MEDIUMBLOB; the owner's spoken languages are fetched separately via
+     * {@link #findLanguagesByUserId(Long)} since they live in a join table.
+     */
+    @Query("SELECT u.id AS id, u.name AS name, u.age AS age, u.sex AS sex, " +
+            "u.occupation AS occupation, u.smokingPreference AS smokingPreference, " +
+            "u.petPolicy AS petPolicy, u.shortDescription AS shortDescription, " +
+            "CASE WHEN u.profilePhoto IS NOT NULL THEN true ELSE false END AS hasPhoto " +
+            "FROM User u WHERE u.id = :id")
+    Optional<PublicProfileView> findPublicProfileById(@Param("id") Long id);
+
+    @Query("SELECT l FROM User u JOIN u.languages l WHERE u.id = :id")
+    List<Language> findLanguagesByUserId(@Param("id") Long id);
 }

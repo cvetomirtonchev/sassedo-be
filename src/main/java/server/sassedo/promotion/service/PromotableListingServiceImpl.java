@@ -4,12 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.rental.data.dto.RentalListing;
 import server.sassedo.listing.rental.repository.RentalListingRepository;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.repository.RoommateListingRepository;
-import server.sassedo.listing.search.data.dto.ApartmentSearch;
-import server.sassedo.listing.search.repository.ApartmentSearchRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
 import server.sassedo.promotion.common.ListingType;
@@ -24,7 +23,6 @@ public class PromotableListingServiceImpl implements PromotableListingService {
 
     private final RentalListingRepository rentalRepository;
     private final RoommateListingRepository roommateRepository;
-    private final ApartmentSearchRepository searchRepository;
 
     @Value("${sassedo.listings.ttl-days:30}")
     private long listingTtlDays;
@@ -34,19 +32,26 @@ public class PromotableListingServiceImpl implements PromotableListingService {
         return switch (type) {
             case RENTAL -> rentalRepository.findById(listingId).orElseThrow(this::notFound).getOwnerId();
             case ROOMMATE -> roommateRepository.findById(listingId).orElseThrow(this::notFound).getOwnerId();
-            case SEARCH -> searchRepository.findById(listingId).orElseThrow(this::notFound).getOwnerId();
+        };
+    }
+
+    @Override
+    public ListingStatus getListingStatus(ListingType type, Long listingId) throws GenericException {
+        return switch (type) {
+            case RENTAL -> rentalRepository.findById(listingId).orElseThrow(this::notFound).getStatus();
+            case ROOMMATE -> roommateRepository.findById(listingId).orElseThrow(this::notFound).getStatus();
         };
     }
 
     @Override
     @Transactional
     public void applyPromotion(ListingType type, Long listingId, PromotionType promotionType, Long promotionId,
-                               LocalDateTime activatedAt, LocalDateTime until, boolean pinned) throws GenericException {
+                               LocalDateTime activatedAt, LocalDateTime until) throws GenericException {
         switch (type) {
             case RENTAL -> {
                 RentalListing listing = rentalRepository.findById(listingId).orElseThrow(this::notFound);
                 PromotionState state = state(listing.getPromotionState());
-                state.applyActive(promotionType, promotionId, activatedAt, until, pinned);
+                state.applyActive(promotionType, promotionId, activatedAt, until);
                 listing.setPromotionState(state);
                 listing.setExpiresAt(activatedAt.plusDays(listingTtlDays));
                 rentalRepository.save(listing);
@@ -54,18 +59,10 @@ public class PromotableListingServiceImpl implements PromotableListingService {
             case ROOMMATE -> {
                 RoommateListing listing = roommateRepository.findById(listingId).orElseThrow(this::notFound);
                 PromotionState state = state(listing.getPromotionState());
-                state.applyActive(promotionType, promotionId, activatedAt, until, pinned);
+                state.applyActive(promotionType, promotionId, activatedAt, until);
                 listing.setPromotionState(state);
                 listing.setExpiresAt(activatedAt.plusDays(listingTtlDays));
                 roommateRepository.save(listing);
-            }
-            case SEARCH -> {
-                ApartmentSearch listing = searchRepository.findById(listingId).orElseThrow(this::notFound);
-                PromotionState state = state(listing.getPromotionState());
-                state.applyActive(promotionType, promotionId, activatedAt, until, pinned);
-                listing.setPromotionState(state);
-                listing.setExpiresAt(activatedAt.plusDays(listingTtlDays));
-                searchRepository.save(listing);
             }
         }
     }
@@ -85,12 +82,6 @@ public class PromotableListingServiceImpl implements PromotableListingService {
                 state.reset();
                 listing.setPromotionState(state);
                 roommateRepository.save(listing);
-            });
-            case SEARCH -> searchRepository.findById(listingId).ifPresent(listing -> {
-                PromotionState state = state(listing.getPromotionState());
-                state.reset();
-                listing.setPromotionState(state);
-                searchRepository.save(listing);
             });
         }
     }

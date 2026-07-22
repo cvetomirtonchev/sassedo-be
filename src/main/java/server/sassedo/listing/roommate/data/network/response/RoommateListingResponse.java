@@ -4,9 +4,10 @@ import lombok.Getter;
 import lombok.Setter;
 import server.sassedo.engagement.service.EngagementAware;
 import server.sassedo.listing.common.*;
+import server.sassedo.listing.common.matching.PreferenceMatchResponse;
 import server.sassedo.promotion.common.PromotionType;
-import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 
 import java.math.BigDecimal;
@@ -23,6 +24,9 @@ public class RoommateListingResponse implements EngagementAware {
     private Long ownerId;
     private String ownerName;
     private String ownerPhotoUrl;
+    // Publicly shareable subset of the owner's profile. Only populated on the single-listing detail
+    // endpoint; null on list/card responses to avoid extra per-row lookups.
+    private OwnerProfileResponse ownerProfile;
     private ListingStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -52,6 +56,8 @@ public class RoommateListingResponse implements EngagementAware {
     private boolean availableAsap;
     private Integer bedrooms;
     private Integer bathrooms;
+    private Boolean sharedBedroom;
+    private Boolean sharedBathroom;
     private Integer areaSqm;
     private RoomArrangement roomArrangement;
     private Boolean owner;
@@ -66,12 +72,10 @@ public class RoommateListingResponse implements EngagementAware {
     private Integer ageMin;
     private Integer ageMax;
     private SmokerPreference smokingPreference;
-    private OccupationPreference occupationPreference;
     private String additionalRequirements;
     private PetPolicy petPolicy;
-    private Integer peopleInProperty;
     private Set<Language> spokenLanguages;
-    private JobStatus employmentStatus;
+    private Occupation employmentStatus;
     private Boolean hasChildren;
     private String aboutMe;
 
@@ -84,11 +88,18 @@ public class RoommateListingResponse implements EngagementAware {
     private PromotionType promotionType;
     private int promotionPriority;
     private LocalDateTime promotedUntil;
-    private boolean pinned;
 
     // Compatibility (0-100) between the requesting user's profile and this listing's roommate
     // requirements. Only populated for authenticated requests; null otherwise.
     private Integer matchScore;
+
+    // Per-requirement match states for the requesting user. Only populated for authenticated
+    // requests; null otherwise.
+    private RoommateRequirementMatchResponse requirementMatch;
+
+    // Which property details match the requesting user's saved preferences. Only populated for
+    // authenticated requests; null otherwise.
+    private PreferenceMatchResponse preferenceMatch;
 
     private long favoriteCount;
     private long viewCount;

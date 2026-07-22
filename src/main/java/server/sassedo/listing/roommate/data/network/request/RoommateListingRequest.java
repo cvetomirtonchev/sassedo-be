@@ -3,8 +3,8 @@ package server.sassedo.listing.roommate.data.network.request;
 import lombok.Getter;
 import lombok.Setter;
 import server.sassedo.listing.common.*;
-import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 
 import java.math.BigDecimal;
@@ -42,6 +42,8 @@ public class RoommateListingRequest {
     private boolean availableAsap;
     private Integer bedrooms;
     private Integer bathrooms;
+    private Boolean sharedBedroom;
+    private Boolean sharedBathroom;
     private Integer areaSqm;
     private RoomArrangement roomArrangement;
     private Boolean owner;
@@ -57,12 +59,10 @@ public class RoommateListingRequest {
     private Integer ageMin;
     private Integer ageMax;
     private SmokerPreference smokingPreference;
-    private OccupationPreference occupationPreference;
     private String additionalRequirements;
     private PetPolicy petPolicy;
-    private Integer peopleInProperty;
     private Set<Language> spokenLanguages = new LinkedHashSet<>();
-    private JobStatus employmentStatus;
+    private Occupation employmentStatus;
     private Boolean hasChildren;
     private String aboutMe;
 

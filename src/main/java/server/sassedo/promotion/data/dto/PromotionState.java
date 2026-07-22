@@ -39,17 +39,13 @@ public class PromotionState {
     @Column(name = "active_promotion_id")
     private Long activePromotionId;
 
-    @Column(name = "pinned", nullable = false)
-    private boolean pinned = false;
-
     public void applyActive(PromotionType type, Long promotionId, LocalDateTime activatedAt,
-                            LocalDateTime until, boolean pinned) {
+                            LocalDateTime until) {
         this.promotionType = type;
         this.promotionPriority = type.getPriority();
         this.activePromotionId = promotionId;
         this.promotionActivatedAt = activatedAt;
         this.promotedUntil = until;
-        this.pinned = pinned;
     }
 
     public void reset() {
@@ -58,6 +54,5 @@ public class PromotionState {
         this.activePromotionId = null;
         this.promotionActivatedAt = null;
         this.promotedUntil = null;
-        this.pinned = false;
     }
 }

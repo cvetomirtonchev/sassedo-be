@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import server.sassedo.listing.rental.repository.RentalListingRepository;
 import server.sassedo.listing.roommate.repository.RoommateListingRepository;
-import server.sassedo.listing.search.repository.ApartmentSearchRepository;
 
 import java.time.LocalDateTime;
 
@@ -27,7 +26,6 @@ public class ListingExpirationScheduler {
 
     private final RentalListingRepository rentalRepository;
     private final RoommateListingRepository roommateRepository;
-    private final ApartmentSearchRepository searchRepository;
 
     @Value("${sassedo.listings.ttl-days:30}")
     private long listingTtlDays;
@@ -38,9 +36,8 @@ public class ListingExpirationScheduler {
         LocalDateTime expiresAt = LocalDateTime.now().plusDays(listingTtlDays);
         int rental = rentalRepository.backfillMissingExpiry(expiresAt);
         int roommate = roommateRepository.backfillMissingExpiry(expiresAt);
-        int search = searchRepository.backfillMissingExpiry(expiresAt);
-        if (rental > 0 || roommate > 0 || search > 0) {
-            log.info("Listing expiry backfill: rental={}, roommate={}, search={}", rental, roommate, search);
+        if (rental > 0 || roommate > 0) {
+            log.info("Listing expiry backfill: rental={}, roommate={}", rental, roommate);
         }
     }
 
@@ -51,9 +48,8 @@ public class ListingExpirationScheduler {
         LocalDateTime now = LocalDateTime.now();
         int rental = rentalRepository.expireOverdue(now);
         int roommate = roommateRepository.expireOverdue(now);
-        int search = searchRepository.expireOverdue(now);
-        if (rental > 0 || roommate > 0 || search > 0) {
-            log.info("Listing expiration sweep: rental={}, roommate={}, search={}", rental, roommate, search);
+        if (rental > 0 || roommate > 0) {
+            log.info("Listing expiration sweep: rental={}, roommate={}", rental, roommate);
         }
     }
 }

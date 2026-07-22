@@ -1,19 +1,19 @@
 package server.sassedo.listing.roommate.matching;
 
 import org.springframework.stereotype.Component;
-import server.sassedo.listing.common.OccupationPreference;
 import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.listing.common.matching.ListingMatchSupport;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
-import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.data.dto.UserPreferencesDto;
 
+import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Scores how well a user matches a roommate listing, combining two families of dimensions:
@@ -43,7 +43,6 @@ public class RoommateMatchScorer {
     private static final double WEIGHT_SEX = 20;
     private static final double WEIGHT_AGE = 20;
     private static final double WEIGHT_SMOKING = 15;
-    private static final double WEIGHT_OCCUPATION = 15;
     private static final double WEIGHT_PETS = 10;
     private static final double WEIGHT_EMPLOYMENT = 10;
     private static final double WEIGHT_LANGUAGES = 10;
@@ -67,8 +66,19 @@ public class RoommateMatchScorer {
      * (e.g. an empty profile against a listing that does specify requirements).
      */
     public Integer score(User user, RoommateListing listing) {
+        return evaluate(user, listing).getScore();
+    }
+
+    /**
+     * Scores the user against the listing and, in addition to the aggregate {@link #score}, reports a
+     * per-requirement {@link RequirementMatchState} so the frontend can highlight individual matches.
+     * When {@code user} or {@code listing} is {@code null} the result has a {@code null} score and all
+     * field states default to {@link RequirementMatchState#NONE}.
+     */
+    public RoommateMatchResult evaluate(User user, RoommateListing listing) {
+        RoommateMatchResult.Builder result = RoommateMatchResult.builder();
         if (user == null || listing == null) {
-            return null;
+            return result.build();
         }
 
         double weightedSum = 0;
@@ -79,8 +89,10 @@ public class RoommateMatchScorer {
         if (listing.getPreferredSex() != null) {
             anyConstraint = true;
             if (user.getSex() != null) {
+                double s = scoreSex(user.getSex(), listing.getPreferredSex());
                 applicableWeight += WEIGHT_SEX;
-                weightedSum += WEIGHT_SEX * scoreSex(user.getSex(), listing.getPreferredSex());
+                weightedSum += WEIGHT_SEX * s;
+                result.sex(stateOf(s));
             }
         }
 
@@ -88,8 +100,10 @@ public class RoommateMatchScorer {
         if (listing.getAgeMin() != null || listing.getAgeMax() != null) {
             anyConstraint = true;
             if (user.getAge() != null) {
+                double s = scoreAge(user.getAge(), listing.getAgeMin(), listing.getAgeMax());
                 applicableWeight += WEIGHT_AGE;
-                weightedSum += WEIGHT_AGE * scoreAge(user.getAge(), listing.getAgeMin(), listing.getAgeMax());
+                weightedSum += WEIGHT_AGE * s;
+                result.age(stateOf(s));
             }
         }
 
@@ -98,21 +112,10 @@ public class RoommateMatchScorer {
                 && listing.getSmokingPreference() != SmokerPreference.NO_PREFERENCE) {
             anyConstraint = true;
             if (user.getSmokingPreference() != null) {
+                double s = scoreSmoking(user.getSmokingPreference(), listing.getSmokingPreference());
                 applicableWeight += WEIGHT_SMOKING;
-                weightedSum += WEIGHT_SMOKING
-                        * scoreSmoking(user.getSmokingPreference(), listing.getSmokingPreference());
-            }
-        }
-
-        // Occupation preference (only a hard preference counts)
-        if (listing.getOccupationPreference() != null
-                && listing.getOccupationPreference() != OccupationPreference.NO_PREFERENCE) {
-            anyConstraint = true;
-            Boolean userIsStudent = userIsStudent(user);
-            if (userIsStudent != null) {
-                applicableWeight += WEIGHT_OCCUPATION;
-                weightedSum += WEIGHT_OCCUPATION
-                        * scoreOccupation(userIsStudent, listing.getOccupationPreference());
+                weightedSum += WEIGHT_SMOKING * s;
+                result.smoking(stateOf(s));
             }
         }
 
@@ -120,18 +123,21 @@ public class RoommateMatchScorer {
         if (listing.getPetPolicy() != null) {
             anyConstraint = true;
             if (user.getPetPolicy() != null) {
+                double s = scorePets(user.getPetPolicy(), listing.getPetPolicy());
                 applicableWeight += WEIGHT_PETS;
-                weightedSum += WEIGHT_PETS * scorePets(user.getPetPolicy(), listing.getPetPolicy());
+                weightedSum += WEIGHT_PETS * s;
+                result.pets(stateOf(s));
             }
         }
 
         // Employment status
         if (listing.getEmploymentStatus() != null) {
             anyConstraint = true;
-            if (user.getJobStatus() != null) {
+            if (user.getOccupation() != null) {
+                double s = scoreEmployment(user.getOccupation(), listing.getEmploymentStatus());
                 applicableWeight += WEIGHT_EMPLOYMENT;
-                weightedSum += WEIGHT_EMPLOYMENT
-                        * scoreEmployment(user.getJobStatus(), listing.getEmploymentStatus());
+                weightedSum += WEIGHT_EMPLOYMENT * s;
+                result.employment(stateOf(s));
             }
         }
 
@@ -139,9 +145,14 @@ public class RoommateMatchScorer {
         if (listing.getSpokenLanguages() != null && !listing.getSpokenLanguages().isEmpty()) {
             anyConstraint = true;
             if (user.getLanguages() != null && !user.getLanguages().isEmpty()) {
+                Set<Language> matchedLanguages = listing.getSpokenLanguages().stream()
+                        .filter(user.getLanguages()::contains)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                double s = scoreLanguages(matchedLanguages);
                 applicableWeight += WEIGHT_LANGUAGES;
-                weightedSum += WEIGHT_LANGUAGES
-                        * scoreLanguages(user.getLanguages(), listing.getSpokenLanguages());
+                weightedSum += WEIGHT_LANGUAGES * s;
+                result.languages(stateOf(s));
+                result.matchedLanguages(matchedLanguages);
             }
         }
 
@@ -241,12 +252,22 @@ public class RoommateMatchScorer {
         }
 
         if (!anyConstraint) {
-            return 100;
+            return result.score(100).build();
         }
         if (applicableWeight == 0) {
-            return null;
+            return result.score(null).build();
         }
-        return (int) Math.round(100.0 * weightedSum / applicableWeight);
+        return result.score((int) Math.round(100.0 * weightedSum / applicableWeight)).build();
+    }
+
+    private RequirementMatchState stateOf(double dimensionScore) {
+        if (dimensionScore >= 1.0) {
+            return RequirementMatchState.EXACT;
+        }
+        if (dimensionScore > 0.0) {
+            return RequirementMatchState.PARTIAL;
+        }
+        return RequirementMatchState.NONE;
     }
 
     private double scoreSex(Sex userSex, Sex preferredSex) {
@@ -275,38 +296,6 @@ public class RoommateMatchScorer {
         return 0.0;
     }
 
-    /**
-     * @return {@code true} if the user is a student, {@code false} if working, or {@code null} when
-     * the user's occupation/job status does not map cleanly to either bucket.
-     */
-    private Boolean userIsStudent(User user) {
-        Occupation occupation = user.getOccupation();
-        if (occupation == Occupation.STUDENT) {
-            return true;
-        }
-        if (occupation == Occupation.WORKING
-                || occupation == Occupation.SELF_EMPLOYED
-                || occupation == Occupation.REMOTE_WORKER) {
-            return false;
-        }
-        JobStatus jobStatus = user.getJobStatus();
-        if (jobStatus == JobStatus.STUDENT) {
-            return true;
-        }
-        if (jobStatus == JobStatus.EMPLOYED || jobStatus == JobStatus.SELF_EMPLOYED) {
-            return false;
-        }
-        return null;
-    }
-
-    private double scoreOccupation(boolean userIsStudent, OccupationPreference required) {
-        return switch (required) {
-            case STUDENT -> userIsStudent ? 1.0 : 0.0;
-            case WORKING -> userIsStudent ? 0.0 : 1.0;
-            case NO_PREFERENCE -> 1.0;
-        };
-    }
-
     private double scorePets(PetPolicy user, PetPolicy required) {
         if (required == PetPolicy.ALL_ALLOWED) {
             return 1.0;
@@ -324,20 +313,16 @@ public class RoommateMatchScorer {
         return 0.0;
     }
 
-    private double scoreEmployment(JobStatus user, JobStatus required) {
-        if (user == required) {
-            return 1.0;
-        }
-        boolean userWorks = user == JobStatus.EMPLOYED || user == JobStatus.SELF_EMPLOYED;
-        boolean requiredWorks = required == JobStatus.EMPLOYED || required == JobStatus.SELF_EMPLOYED;
-        if (userWorks && requiredWorks) {
-            return 0.6;
-        }
-        return 0.0;
+    private double scoreEmployment(Occupation user, Occupation required) {
+        // Employment is a strict match: either the viewer's status equals the requirement or it does
+        // not count at all (no soft match between employed and self-employed).
+        return user == required ? 1.0 : 0.0;
     }
 
-    private double scoreLanguages(Set<Language> userLanguages, Set<Language> requiredLanguages) {
-        long overlap = requiredLanguages.stream().filter(userLanguages::contains).count();
-        return (double) overlap / requiredLanguages.size();
+    /**
+     * Any overlap between the viewer's languages and the required languages counts as a full match.
+     */
+    private double scoreLanguages(Set<Language> matchedLanguages) {
+        return matchedLanguages.isEmpty() ? 0.0 : 1.0;
     }
 }

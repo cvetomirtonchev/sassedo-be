@@ -63,9 +63,6 @@ public class User {
     @Column(name = "language")
     private Set<Language> languages = new LinkedHashSet<>();
 
-    @Enumerated(EnumType.STRING)
-    private JobStatus jobStatus;
-
     @Size(max = 100)
     private String profession;
 

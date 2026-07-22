@@ -22,6 +22,4 @@ public class GrantPromotionRequest {
 
     @Min(1)
     private int durationDays;
-
-    private boolean pinned = false;
 }

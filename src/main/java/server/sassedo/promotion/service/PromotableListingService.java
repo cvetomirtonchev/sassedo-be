@@ -1,5 +1,6 @@
 package server.sassedo.promotion.service;
 
+import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.promotion.common.ListingType;
 import server.sassedo.promotion.common.PromotionType;
 import server.sassedo.model.GenericException;
@@ -15,8 +16,10 @@ public interface PromotableListingService {
 
     Long getOwnerId(ListingType type, Long listingId) throws GenericException;
 
+    ListingStatus getListingStatus(ListingType type, Long listingId) throws GenericException;
+
     void applyPromotion(ListingType type, Long listingId, PromotionType promotionType, Long promotionId,
-                        LocalDateTime activatedAt, LocalDateTime until, boolean pinned) throws GenericException;
+                        LocalDateTime activatedAt, LocalDateTime until) throws GenericException;
 
     void clearPromotion(ListingType type, Long listingId);
 }

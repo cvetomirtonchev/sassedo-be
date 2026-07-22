@@ -8,7 +8,6 @@ import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.common.RoomAmenity;
 import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.user.data.dto.ERole;
-import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
@@ -47,8 +46,6 @@ public class UserResponse {
     private Sex sex;
 
     private Set<Language> languages;
-
-    private JobStatus jobStatus;
 
     private String profession;
 

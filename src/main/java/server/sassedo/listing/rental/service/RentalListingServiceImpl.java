@@ -22,6 +22,8 @@ import server.sassedo.location.repository.CityRepository;
 import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
+import server.sassedo.promotion.common.ListingType;
+import server.sassedo.promotion.service.PromotionService;
 import server.sassedo.utils.ImageProcessor;
 import server.sassedo.utils.ImageUploadValidator;
 
@@ -39,6 +41,7 @@ public class RentalListingServiceImpl implements RentalListingService {
     private final RentalListingPhotoRepository photoRepository;
     private final CountryRepository countryRepository;
     private final CityRepository cityRepository;
+    private final PromotionService promotionService;
 
     @Value("${sassedo.listings.ttl-days:30}")
     private long listingTtlDays;
@@ -134,7 +137,12 @@ public class RentalListingServiceImpl implements RentalListingService {
         if (status == ListingStatus.ACTIVE) {
             listing.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
         }
-        return listingRepository.save(listing);
+        RentalListing saved = listingRepository.save(listing);
+        if (status == ListingStatus.ACTIVE) {
+            // Start any promotion that was paid for while the listing awaited approval.
+            promotionService.activateDeferredForListing(ListingType.RENTAL, id);
+        }
+        return saved;
     }
 
     @Override
@@ -177,6 +185,8 @@ public class RentalListingServiceImpl implements RentalListingService {
     @Transactional
     public void delete(Long id) throws GenericException {
         RentalListing listing = getById(id);
+        // Release any promotion awaiting approval so it is not left blocking / orphaned.
+        promotionService.cancelDeferredForListing(ListingType.RENTAL, id);
         listingRepository.delete(listing);
     }
 

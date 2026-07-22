@@ -26,8 +26,12 @@ public class PromotionScheduler {
         LocalDateTime now = LocalDateTime.now();
         int activated = promotionService.activateScheduled(now);
         int expired = promotionService.expireOverdue(now);
-        if (activated > 0 || expired > 0) {
-            log.info("Promotion sweep: activated={}, expired={}", activated, expired);
+        // Safety net for the rare race where a listing is approved before its paid promotion is
+        // recorded as deferred: promotions parked for approval whose listing is now ACTIVE.
+        int reconciled = promotionService.activateApprovedDeferred();
+        if (activated > 0 || expired > 0 || reconciled > 0) {
+            log.info("Promotion sweep: activated={}, expired={}, reconciled={}",
+                    activated, expired, reconciled);
         }
     }
 }

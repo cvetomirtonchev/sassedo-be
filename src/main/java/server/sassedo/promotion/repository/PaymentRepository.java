@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import server.sassedo.promotion.common.PaymentProviderType;
 import server.sassedo.promotion.data.dto.Payment;
 
 import java.util.List;
@@ -15,7 +16,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     List<Payment> findByPurchaseIdInOrderByCreatedAtDesc(List<Long> purchaseIds);
 
-    Payment findFirstByProviderRefOrderByCreatedAtDesc(String providerRef);
+    Payment findFirstByProviderAndProviderRefOrderByCreatedAtDesc(
+            PaymentProviderType provider, String providerRef);
 
     Page<Payment> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

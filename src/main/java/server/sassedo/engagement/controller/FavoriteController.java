@@ -18,10 +18,6 @@ import server.sassedo.listing.roommate.controller.RoommateListingMapper;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.network.response.RoommateListingResponse;
 import server.sassedo.listing.roommate.service.RoommateListingService;
-import server.sassedo.listing.search.controller.ApartmentSearchMapper;
-import server.sassedo.listing.search.data.dto.ApartmentSearch;
-import server.sassedo.listing.search.data.network.response.ApartmentSearchResponse;
-import server.sassedo.listing.search.service.ApartmentSearchService;
 import server.sassedo.model.GenericException;
 import server.sassedo.promotion.common.ListingType;
 import server.sassedo.security.jwt.JwtUtils;
@@ -46,10 +42,8 @@ public class FavoriteController {
 
     private final RentalListingService rentalListingService;
     private final RoommateListingService roommateListingService;
-    private final ApartmentSearchService apartmentSearchService;
     private final RentalListingMapper rentalMapper;
     private final RoommateListingMapper roommateMapper;
-    private final ApartmentSearchMapper searchMapper;
 
     @PostMapping
     public ResponseEntity<?> add(@RequestBody FavoriteRequest request, HttpServletRequest httpRequest) {
@@ -98,23 +92,10 @@ public class FavoriteController {
             }
         }
 
-        List<ApartmentSearchResponse> searches = new ArrayList<>();
-        for (Favorite favorite : favoriteService.listMine(userId, ListingType.SEARCH)) {
-            try {
-                ApartmentSearch entity = apartmentSearchService.getById(favorite.getListingId());
-                ApartmentSearchResponse response = searchMapper.map(entity);
-                searchMapper.enrichOwner(response, entity.getOwnerId());
-                searches.add(response);
-            } catch (GenericException ignored) {
-                // listing was deleted; skip it
-            }
-        }
-
         engagementEnricher.enrich(ListingType.RENTAL, rentals, userId, false);
         engagementEnricher.enrich(ListingType.ROOMMATE, roommates, userId, false);
-        engagementEnricher.enrich(ListingType.SEARCH, searches, userId, false);
 
-        return ResponseEntity.ok(new MyFavoritesResponse(rentals, roommates, searches));
+        return ResponseEntity.ok(new MyFavoritesResponse(rentals, roommates));
     }
 
     private User resolveUser(Long userId) {

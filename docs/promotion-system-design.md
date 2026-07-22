@@ -7,8 +7,8 @@ implementation in `sassedo-be` and `sassedo-fe` follows it directly.
 
 - Backend: Spring Boot 4 / Java 17 / MySQL (Hibernate `ddl-auto=update`, no Flyway today)
 - Frontend: Next.js 16 / React 19 / Tailwind v4 / shadcn/ui / Zustand / React Query
-- Promotions are **polymorphic** across the three existing listing markets:
-  `rental_listings`, `roommate_listings`, `apartment_searches`.
+- Promotions are **polymorphic** across the existing listing markets:
+  `rental_listings`, `roommate_listings`.
 
 ---
 
@@ -18,7 +18,7 @@ implementation in `sassedo-be` and `sassedo-fe` follows it directly.
 | --- | --- | --- | --- | --- | --- |
 | **Standard** | Free | After all paid | none | default | newest first (`created_at`) |
 | **Promoted** | Paid | Before Standard | "Promoted" | default | newest active promotion, then newest listing |
-| **Featured** | Paid | Before everything | "Featured" | highlighted (ring + soft bg), optional pin | newest active promotion, then newest listing |
+| **Featured** | Paid | Before everything | "Featured" | highlighted (ring + soft bg) | newest active promotion, then newest listing |
 
 Global order is always **Featured → Promoted → Standard**. Within a tier: newest active
 promotion first, then newest listing. Expired promotions automatically downgrade the
@@ -33,10 +33,10 @@ listing back to Standard.
 New backend module `server.sassedo.promotion`.
 
 - **PromotionPackage** — an admin-configured, purchasable product.
-  `id, name, description, type (PROMOTED|FEATURED), durationDays, priceCents, currency,
-  active, sortPriority, pinnable, createdAt, updatedAt`.
+  `id, nameEn, nameBg, description, type (PROMOTED|FEATURED), durationDays, priceCents,
+  currency, active, sortPriority, createdAt, updatedAt`.
 - **Promotion** — the lifecycle + audit record for a single promotion of a single listing.
-  `id, listingType (RENTAL|ROOMMATE|SEARCH), listingId, ownerId, packageId, type, status,
+  `id, listingType (RENTAL|ROOMMATE), listingId, ownerId, packageId, type, status,
   startDate, endDate, purchaseId, source (PURCHASE|ADMIN_GRANT), createdAt, updatedAt`.
   **Never hard-deleted** — history is retained for auditing.
 - **Purchase** — an order placed by a user for a package against a listing.
@@ -50,7 +50,7 @@ New backend module `server.sassedo.promotion`.
 
 To sort millions of listings by tier **without joining the polymorphic `promotions`
 table at read time**, each listing row carries an embedded `PromotionState`
-(`@Embeddable`, reused by all three listing entities):
+(`@Embeddable`, reused by both listing entities):
 
 | Column | Type | Purpose |
 | --- | --- | --- |
@@ -59,7 +59,6 @@ table at read time**, each listing row carries an embedded `PromotionState`
 | `promoted_until` | DATETIME NULL | expiration timestamp / quick checks. |
 | `promotion_type` | VARCHAR NULL | denormalized `PROMOTED`/`FEATURED` for the badge. |
 | `active_promotion_id` | BIGINT NULL | pointer to the active `Promotion` row. |
-| `pinned` | BOOLEAN | featured pin flag for category pages. |
 
 The `promotions` table remains the source of truth; the activation logic and the
 scheduler keep these columns in sync. This is a classic read-optimized denormalization:
@@ -77,14 +76,14 @@ erDiagram
 
     PROMOTION_PACKAGE {
         bigint id PK
-        varchar name
+        varchar nameEn
+        varchar nameBg
         varchar type
         int durationDays
         int priceCents
         varchar currency
         boolean active
         int sortPriority
-        boolean pinnable
     }
     PROMOTION {
         bigint id PK
@@ -128,7 +127,6 @@ erDiagram
         datetime promoted_until
         varchar promotion_type
         bigint active_promotion_id
-        boolean pinned
     }
 ```
 
@@ -140,7 +138,7 @@ All persisted `@Enumerated(EnumType.STRING)` per repo convention.
 - `PromotionStatus { PENDING_PAYMENT, SCHEDULED, ACTIVE, EXPIRED, CANCELLED, REFUNDED }`
 - `PaymentProviderType { MOCK, STRIPE }`
 - `PaymentStatus { PENDING, COMPLETED, FAILED, CANCELLED, REFUNDED }`
-- `ListingType { RENTAL, ROOMMATE, SEARCH }`
+- `ListingType { RENTAL, ROOMMATE }`
 - `PromotionSource { PURCHASE, ADMIN_GRANT }`
 
 ---
@@ -154,7 +152,8 @@ once Flyway is introduced (recommended before production — see §11).
 ```sql
 CREATE TABLE promotion_packages (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name          VARCHAR(120) NOT NULL,
+    name_en       VARCHAR(120) NOT NULL,
+    name_bg       VARCHAR(120) NOT NULL,
     description   VARCHAR(500),
     type          VARCHAR(20)  NOT NULL,           -- PROMOTED | FEATURED
     duration_days INT          NOT NULL,
@@ -162,7 +161,6 @@ CREATE TABLE promotion_packages (
     currency      VARCHAR(3)   NOT NULL DEFAULT 'EUR',
     active        BOOLEAN      NOT NULL DEFAULT TRUE,
     sort_priority INT          NOT NULL DEFAULT 0, -- admin ordering of packages
-    pinnable      BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at    DATETIME     NOT NULL,
     updated_at    DATETIME,
     CONSTRAINT chk_pkg_price CHECK (price_cents >= 0),
@@ -171,7 +169,7 @@ CREATE TABLE promotion_packages (
 
 CREATE TABLE promotions (
     id             BIGINT AUTO_INCREMENT PRIMARY KEY,
-    listing_type   VARCHAR(20)  NOT NULL,          -- RENTAL | ROOMMATE | SEARCH
+    listing_type   VARCHAR(20)  NOT NULL,          -- RENTAL | ROOMMATE
     listing_id     BIGINT       NOT NULL,
     owner_id       BIGINT       NOT NULL,
     package_id     BIGINT,
@@ -216,15 +214,14 @@ CREATE TABLE payments (
     CONSTRAINT fk_payment_purchase FOREIGN KEY (purchase_id) REFERENCES purchases(id)
 );
 
--- Denormalized columns added to EACH of the three listing tables
+-- Denormalized columns added to EACH listing table
 ALTER TABLE rental_listings
     ADD COLUMN promotion_priority     INT NOT NULL DEFAULT 0,
     ADD COLUMN promotion_activated_at DATETIME NULL,
     ADD COLUMN promoted_until         DATETIME NULL,
     ADD COLUMN promotion_type         VARCHAR(20) NULL,
-    ADD COLUMN active_promotion_id    BIGINT NULL,
-    ADD COLUMN pinned                 BOOLEAN NOT NULL DEFAULT FALSE;
--- (identical ALTER for roommate_listings and apartment_searches)
+    ADD COLUMN active_promotion_id    BIGINT NULL;
+-- (identical ALTER for roommate_listings)
 ```
 
 ### 3.1 Indexes
@@ -235,8 +232,6 @@ CREATE INDEX idx_rental_browse
     ON rental_listings (status, promotion_priority, promotion_activated_at, created_at);
 CREATE INDEX idx_roommate_browse
     ON roommate_listings (status, promotion_priority, promotion_activated_at, created_at);
-CREATE INDEX idx_search_browse
-    ON apartment_searches (status, promotion_priority, promotion_activated_at, created_at);
 
 -- Scheduler / lookups on the promotions table.
 CREATE INDEX idx_promo_status_end   ON promotions (status, end_date);
@@ -270,19 +265,20 @@ the `/admin/...` path segment, auto-protected by the existing
 GET  /api/promotion-packages                 (public) active packages
 GET  /api/promotion-packages/admin/all       (admin)  all packages
 POST /api/promotion-packages/admin           (admin)  create
-PUT  /api/promotion-packages/admin/{id}      (admin)  update (price, duration, active, order, pinnable)
+PUT  /api/promotion-packages/admin/{id}      (admin)  update (names, price, duration, active, order)
 DELETE /api/promotion-packages/admin/{id}    (admin)  deactivate (soft)
 ```
 
 ```json
 // POST /api/promotion-packages/admin
-{ "name": "Featured 14 days", "type": "FEATURED", "durationDays": 14,
-  "priceCents": 2999, "currency": "EUR", "sortPriority": 20, "pinnable": true }
+{ "nameEn": "Featured 14 days", "nameBg": "Акцентирана за 14 дни",
+  "type": "FEATURED", "durationDays": 14, "priceCents": 2999,
+  "currency": "EUR", "sortPriority": 20 }
 
 // 200 OK
-{ "id": 6, "name": "Featured 14 days", "type": "FEATURED", "durationDays": 14,
-  "priceCents": 2999, "currency": "EUR", "active": true, "sortPriority": 20,
-  "pinnable": true }
+{ "id": 6, "nameEn": "Featured 14 days", "nameBg": "Акцентирана за 14 дни",
+  "type": "FEATURED", "durationDays": 14, "priceCents": 2999,
+  "currency": "EUR", "active": true, "sortPriority": 20 }
 ```
 
 ### 4.2 Purchases (the "Promote" action)
@@ -438,19 +434,48 @@ the dashboard payment history.
    `ACTIVE`; write the listing's denormalized columns.
 2. **Expire** — `Promotion` rows in `ACTIVE` whose `endDate <= now` become `EXPIRED`;
    reset that listing's denormalized columns to Standard (`priority=0`, null timestamps).
+3. **Reconcile approved deferrals** — `Promotion` rows parked for approval (`SCHEDULED`
+   with `startDate == null`, see §6.1) whose listing has since become `ACTIVE` are
+   activated. This is a safety net for the rare race where a listing is approved before its
+   paid promotion is recorded as deferred; the primary trigger is the listing-approval hook.
 
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING_PAYMENT: purchase created
-    PENDING_PAYMENT --> ACTIVE: payment COMPLETED (startDate<=now)
+    PENDING_PAYMENT --> ACTIVE: payment COMPLETED (listing already ACTIVE)
+    PENDING_PAYMENT --> SCHEDULED: payment COMPLETED (listing PENDING approval, no dates)
     PENDING_PAYMENT --> SCHEDULED: payment COMPLETED (future start)
     PENDING_PAYMENT --> CANCELLED: payment failed/cancelled
-    SCHEDULED --> ACTIVE: scheduler (startDate<=now)
+    SCHEDULED --> ACTIVE: listing approved OR scheduler (startDate<=now)
+    SCHEDULED --> CANCELLED: listing rejected+deleted / owner cancels
     ACTIVE --> EXPIRED: scheduler (endDate<=now)
     ACTIVE --> CANCELLED: user/admin cancels
     ACTIVE --> REFUNDED: refund webhook
     EXPIRED --> [*]
 ```
+
+### 6.1 Deferred activation for listings awaiting approval
+
+New listings are created `PENDING` and are not publicly visible until an admin approves them
+(`ACTIVE`). A promotion may be purchased during publishing, so the paid period must not start
+while the listing is still hidden. This is modelled by **overloading `SCHEDULED`**:
+
+- On a completed payment, `PromotionService.onPaymentCompleted` checks the listing status:
+  - **listing `ACTIVE`** → activate immediately (`startDate = now`, `endDate = now + duration`).
+  - **listing `PENDING`** → park the promotion as `SCHEDULED` with `startDate == null` and
+    `endDate == null`, and do **not** write the listing's denormalized promotion columns.
+- `startDate == null` keeps the parked promotion out of the time-based activation query
+  (`startDate <= now` never matches null), so it only starts via the approval hook.
+- When the listing is approved (`RentalListingServiceImpl` / `RoommateListingServiceImpl`
+  `setStatus(ACTIVE)`), `PromotionService.activateDeferredForListing` starts the parked
+  promotion and computes its full duration from the approval moment.
+- Purchases are only accepted for listings that are `PENDING` or `ACTIVE`
+  (`PurchaseServiceImpl`), never for rejected/inactive/expired listings.
+- Rejection leaves the parked promotion `SCHEDULED` so it can start after a later correction
+  and approval; deleting the listing cancels its parked promotion for a clean audit trail.
+- Activation is idempotent (`activate` no-ops on an already-`ACTIVE` promotion) and the
+  payment webhook only reacts to a `PENDING_PAYMENT` promotion, so duplicate or out-of-order
+  webhooks and a concurrent approval cannot double-activate or restart the clock.
 
 ---
 
@@ -497,7 +522,7 @@ background), Promoted = default card + amber "Promoted" badge.
 
 ```
 +------------------------------------------------------------------+
-|  [logo]        Find apartment  Find roommate  Find tenant  [👤]  |
+|  [logo]        Find apartment  Find roommate  [👤]              |
 +------------------------------------------------------------------+
 |         Hero: "Find your next home"   [ Search ▸ ]               |
 +------------------------------------------------------------------+
@@ -606,9 +631,9 @@ Promote dialog ──▶ [Pay & activate]
 +------------------------------------------------------------------+
 |  [ Packages ] [ Promotions ] [ Purchases ] [ Payments ]          |
 |  --- Packages -------------------------------------------------- |
-|  Name              Type      Dur  Price   Order  Active  [Edit]  |
-|  Promoted 7 days   PROMOTED   7   €4.99    10     ✓      [·][x]  |
-|  Featured 14 days  FEATURED  14  €24.99    20     ✓      [·][x]  |
+|  English name      Bulgarian name       Type      Dur  Price     |
+|  Promoted 7 days   Промотирана за 7 дни PROMOTED   7   €4.99    |
+|  Featured 14 days  Акцентирана за 14 дни FEATURED  14  €24.99   |
 |  [ + New package ]                                               |
 |  --- Promotions ------------------------------------------------ |
 |  #21 ROOMMATE 88  FEATURED ACTIVE  ends 5 Aug  [Grant][Remove]  |
@@ -643,8 +668,7 @@ preserving a fair, discoverable free tier.
 - `lib/api/{promotion-packages,promotions,purchases,payments}.ts` — typed API functions
   mirroring `lib/api/rental-listings.ts`.
 - `hooks/use-{promotion-packages,promotions,purchases}.ts` — React Query hooks.
-- The three listing types gain `promotionTier`, `isFeatured`, `isPromoted`,
-  `promotedUntil`, `pinned`.
+- Both listing types expose `promotionType`, `promotionPriority`, and `promotedUntil`.
 - `components/listings/promotion-badge.tsx` + `favorite-button.tsx` (localStorage stub —
   there is no favorites backend yet).
 - Cards render badge, publish date, favorite, and a highlighted Featured style using the
@@ -661,6 +685,9 @@ preserving a fair, discoverable free tier.
 - **Flyway/Liquibase** is not in the project; schema currently evolves via Hibernate
   `ddl-auto=update`. Introduce Flyway and ship §3 as the first versioned migration before
   going to production.
+- Existing databases must run `scripts/migrate-localize-promotion-packages.sql` once,
+  with application instances stopped and a verified backup, before deploying the backend
+  and frontend that require both localized names.
 - **Favorites** are a client-side localStorage stub; a real backend `favorites` table +
   API is a follow-up.
 - **Invoices** are represented via `Payment.rawPayload`; a dedicated invoice/receipt

@@ -8,10 +8,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import server.sassedo.model.GenericException;
 import server.sassedo.promotion.common.PaymentStatus;
+import server.sassedo.promotion.common.PromotionStatus;
 import server.sassedo.promotion.data.dto.Payment;
 import server.sassedo.promotion.data.dto.Promotion;
 import server.sassedo.promotion.data.dto.Purchase;
 import server.sassedo.promotion.payment.CheckoutResult;
+import server.sassedo.promotion.payment.InvalidPaymentWebhookException;
 import server.sassedo.promotion.payment.PaymentProvider;
 import server.sassedo.promotion.payment.WebhookResult;
 import server.sassedo.promotion.repository.PaymentRepository;
@@ -51,7 +53,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         Promotion resultingPromotion = promotion;
         if (result.status() == PaymentStatus.COMPLETED) {
-            resultingPromotion = promotionService.activate(promotion);
+            resultingPromotion = promotionService.onPaymentCompleted(promotion);
         } else if (result.status() == PaymentStatus.FAILED
                 || result.status() == PaymentStatus.CANCELLED) {
             promotionService.markPaymentFailed(promotion);
@@ -63,37 +65,62 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public void handleWebhook(String provider, String rawBody, String signature) {
+        if (provider == null || !paymentProvider.type().name().equalsIgnoreCase(provider)) {
+            throw new InvalidPaymentWebhookException("Unsupported payment webhook provider");
+        }
         WebhookResult result = paymentProvider.handleWebhook(rawBody, signature);
         if (result.providerRef() == null) {
             log.info("Webhook from {} without a provider reference; ignoring", provider);
             return;
         }
-        Payment payment = paymentRepository.findFirstByProviderRefOrderByCreatedAtDesc(result.providerRef());
+        Payment payment = paymentRepository.findFirstByProviderAndProviderRefOrderByCreatedAtDesc(
+                paymentProvider.type(), result.providerRef());
         if (payment == null) {
-            log.warn("Webhook referenced unknown payment ref {}", result.providerRef());
-            return;
+            throw new IllegalStateException("Webhook referenced unknown payment ref " + result.providerRef());
         }
         try {
-            confirm(payment, result.status());
+            confirm(payment, result.status(), result.rawPayload());
         } catch (GenericException e) {
-            log.error("Failed to confirm payment {} from webhook: {}", payment.getId(), e.getMessage());
+            throw new IllegalStateException("Failed to confirm payment " + payment.getId(), e);
         }
     }
 
-    private void confirm(Payment payment, PaymentStatus status) throws GenericException {
-        payment.setStatus(status);
-        paymentRepository.save(payment);
-
-        Purchase purchase = purchaseRepository.findById(payment.getPurchaseId()).orElse(null);
-        if (purchase == null) {
+    private void confirm(Payment payment, PaymentStatus status, String rawPayload) throws GenericException {
+        if (payment.getStatus() == status) {
+            log.info("Ignoring duplicate {} webhook for payment {}", status, payment.getId());
             return;
         }
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            log.warn("Ignoring out-of-order payment transition {} -> {} for payment {}",
+                    payment.getStatus(), status, payment.getId());
+            return;
+        }
+
+        payment.setStatus(status);
+        payment.setRawPayload(rawPayload);
+        paymentRepository.save(payment);
+
+        Purchase purchase = purchaseRepository.findById(payment.getPurchaseId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Payment " + payment.getId() + " references a missing purchase"));
         purchase.setStatus(status);
         purchaseRepository.save(purchase);
 
-        if (status == PaymentStatus.COMPLETED && purchase.getPromotionId() != null) {
-            Promotion promotion = promotionService.getById(purchase.getPromotionId());
-            promotionService.activate(promotion);
+        if (purchase.getPromotionId() == null) {
+            throw new IllegalStateException(
+                    "Purchase " + purchase.getId() + " does not reference a promotion");
+        }
+        Promotion promotion = promotionService.getById(purchase.getPromotionId());
+        if (status == PaymentStatus.COMPLETED) {
+            // Idempotent: only a still-pending promotion should react to a completed payment,
+            // so duplicate or out-of-order webhooks do not re-activate or restart the clock.
+            if (promotion.getStatus() == PromotionStatus.PENDING_PAYMENT) {
+                promotionService.onPaymentCompleted(promotion);
+            }
+        } else if (status == PaymentStatus.FAILED || status == PaymentStatus.CANCELLED) {
+            if (promotion.getStatus() == PromotionStatus.PENDING_PAYMENT) {
+                promotionService.markPaymentFailed(promotion);
+            }
         }
     }
 

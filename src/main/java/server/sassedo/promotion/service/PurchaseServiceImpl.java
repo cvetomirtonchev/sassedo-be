@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
 import server.sassedo.promotion.common.PaymentStatus;
@@ -43,6 +44,15 @@ public class PurchaseServiceImpl implements PurchaseService {
                     "You are not the owner of this listing");
         }
 
+        // Promotions can be bought during publishing (listing PENDING approval) or for a live
+        // listing. Buying for rejected/inactive/expired listings is not allowed.
+        ListingStatus listingStatus = listingService.getListingStatus(
+                request.getListingType(), request.getListingId());
+        if (listingStatus != ListingStatus.PENDING && listingStatus != ListingStatus.ACTIVE) {
+            throw new GenericException(GenericExceptionCode.INVALID_LISTING_STATE,
+                    "Promotions can only be purchased for pending or active listings");
+        }
+
         Promotion promotion = promotionService.createPending(buyerId, pkg,
                 request.getListingType(), request.getListingId());
 
@@ -56,6 +66,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         purchase.setStatus(PaymentStatus.PENDING);
         purchase.setPromotionId(promotion.getId());
         purchase = purchaseRepository.save(purchase);
+        promotion = promotionService.linkPurchase(promotion, purchase.getId());
 
         CheckoutOutcome outcome = paymentService.startCheckout(purchase, promotion);
         return new PurchaseResult(purchase, outcome);

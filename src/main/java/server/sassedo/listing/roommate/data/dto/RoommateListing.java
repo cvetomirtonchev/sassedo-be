@@ -7,8 +7,8 @@ import server.sassedo.listing.common.*;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
 import server.sassedo.promotion.data.dto.PromotionState;
-import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 
 import java.math.BigDecimal;
@@ -99,6 +99,13 @@ public class RoommateListing {
 
     private Integer bathrooms;
 
+    // Whether the offered bedroom/bathroom is shared. With-property only.
+    @Column(name = "shared_bedroom")
+    private Boolean sharedBedroom;
+
+    @Column(name = "shared_bathroom")
+    private Boolean sharedBathroom;
+
     /** Usable area in square meters. Optional; used by the impossible-data fraud rule. */
     @Column(name = "area_sqm")
     private Integer areaSqm;
@@ -153,10 +160,6 @@ public class RoommateListing {
     @Column(name = "smoking_preference")
     private SmokerPreference smokingPreference;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "occupation_preference")
-    private OccupationPreference occupationPreference;
-
     @Lob
     @Column(name = "additional_requirements", columnDefinition = "TEXT")
     private String additionalRequirements;
@@ -164,9 +167,6 @@ public class RoommateListing {
     @Enumerated(EnumType.STRING)
     @Column(name = "pet_policy")
     private PetPolicy petPolicy;
-
-    @Column(name = "people_in_property")
-    private Integer peopleInProperty;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
@@ -176,7 +176,7 @@ public class RoommateListing {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "employment_status")
-    private JobStatus employmentStatus;
+    private Occupation employmentStatus;
 
     // Whether the lister has children. Part of the lifestyle info shown for listers without a property.
     @Column(name = "has_children")

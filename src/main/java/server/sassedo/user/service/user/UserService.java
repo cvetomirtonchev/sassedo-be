@@ -12,10 +12,14 @@ import server.sassedo.user.data.network.request.UpdateProfileRequest;
 import server.sassedo.user.data.network.request.UpdateUserPreferencesRequest;
 import server.sassedo.user.data.network.request.UpdateUserRoleRequest;
 import server.sassedo.user.data.network.request.VerifyUserRequest;
+import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.projection.PublicProfileView;
 import server.sassedo.user.data.projection.UserParticipantSummary;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.util.Set;
 
 import jakarta.mail.MessagingException;
 import java.io.IOException;
@@ -41,6 +45,18 @@ public interface UserService {
      * without pulling image bytes into heap for every card.
      */
     UserParticipantSummary getUserSummary(Long id);
+
+    /**
+     * Publicly shareable profile attributes (scalar fields only, no photo blob) for the given user,
+     * used to enrich a roommate listing detail response. Returns {@code null} when the user does not
+     * exist.
+     */
+    PublicProfileView getPublicProfile(Long id);
+
+    /**
+     * The given user's spoken languages, fetched without loading the rest of the profile.
+     */
+    Set<Language> getUserLanguages(Long id);
 
     User getUserByEmail(String email) throws GenericException;
 

@@ -9,7 +9,8 @@ import server.sassedo.promotion.common.PromotionType;
 public class PromotionPackageResponse {
 
     private Long id;
-    private String name;
+    private String nameEn;
+    private String nameBg;
     private String description;
     private PromotionType type;
     private int durationDays;
@@ -17,5 +18,4 @@ public class PromotionPackageResponse {
     private String currency;
     private boolean active;
     private int sortPriority;
-    private boolean pinnable;
 }

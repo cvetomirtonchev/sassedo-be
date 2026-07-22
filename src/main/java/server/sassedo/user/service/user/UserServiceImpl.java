@@ -17,10 +17,12 @@ import server.sassedo.model.GenericExceptionCode;
 import server.sassedo.utils.ImageProcessor;
 import server.sassedo.utils.ImageUploadValidator;
 import server.sassedo.user.data.dto.ERole;
+import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.PasswordResetToken;
 import server.sassedo.user.data.dto.Role;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.data.dto.UserPreferencesDto;
+import server.sassedo.user.data.projection.PublicProfileView;
 import server.sassedo.user.data.projection.UserParticipantSummary;
 import server.sassedo.user.data.network.UpdateUserRequest;
 import server.sassedo.user.data.network.request.*;
@@ -169,6 +171,22 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public PublicProfileView getPublicProfile(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return userRepository.findPublicProfileById(id).orElse(null);
+    }
+
+    @Override
+    public Set<Language> getUserLanguages(Long id) {
+        if (id == null) {
+            return Collections.emptySet();
+        }
+        return new LinkedHashSet<>(userRepository.findLanguagesByUserId(id));
+    }
+
+    @Override
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email);
     }
@@ -258,9 +276,6 @@ public class UserServiceImpl implements UserService {
         }
         if (request.getLanguages() != null) {
             user.setLanguages(new LinkedHashSet<>(request.getLanguages()));
-        }
-        if (request.getJobStatus() != null) {
-            user.setJobStatus(request.getJobStatus());
         }
         if (request.getProfession() != null) {
             user.setProfession(request.getProfession());
@@ -354,9 +369,6 @@ public class UserServiceImpl implements UserService {
         if (request.getLanguages() != null) {
             user.setLanguages(new LinkedHashSet<>(request.getLanguages()));
         }
-        if (request.getJobStatus() != null) {
-            user.setJobStatus(request.getJobStatus());
-        }
         if (request.getProfession() != null) {
             user.setProfession(request.getProfession());
         }
@@ -447,7 +459,7 @@ public class UserServiceImpl implements UserService {
                 && user.getAge() != null
                 && user.getSex() != null
                 && user.getLanguages() != null && !user.getLanguages().isEmpty()
-                && user.getJobStatus() != null
+                && user.getOccupation() != null
                 && user.getSmokingPreference() != null
                 && user.getPetPolicy() != null;
     }

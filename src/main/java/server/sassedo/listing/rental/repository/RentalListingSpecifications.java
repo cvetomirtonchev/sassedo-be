@@ -7,6 +7,7 @@ import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingStatus;
+import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.PropertyAmenity;
 import server.sassedo.listing.rental.data.dto.RentalListing;
 
@@ -55,6 +56,9 @@ public final class RentalListingSpecifications {
                         cb.lessThanOrEqualTo(root.get("availableFrom"), f.getAvailableBy()));
                 predicates.add(cb.or(asap, byDate));
             }
+            if (Boolean.TRUE.equals(f.getAvailableAsap())) {
+                predicates.add(cb.isTrue(root.get("availableAsap")));
+            }
             if (f.getMinBedrooms() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("bedrooms"), f.getMinBedrooms()));
             }
@@ -94,6 +98,18 @@ public final class RentalListingSpecifications {
                     sub.select(subRoot.get("id"));
                     sub.where(cb.and(cb.equal(subRoot.get("id"), root.get("id")), cb.equal(am, amenity)));
                     predicates.add(cb.exists(sub));
+                }
+            }
+            // Pets: rentals model pet acceptance via petPolicy. "Allowed" means any policy other than
+            // NOT_ALLOWED; "not allowed" means exactly NOT_ALLOWED. Listings with no policy set are
+            // excluded from both so an unknown policy never matches a specific choice.
+            if (f.getPetsAllowed() != null) {
+                if (Boolean.TRUE.equals(f.getPetsAllowed())) {
+                    predicates.add(cb.and(
+                            cb.isNotNull(root.get("petPolicy")),
+                            cb.notEqual(root.get("petPolicy"), PetPolicy.NOT_ALLOWED)));
+                } else {
+                    predicates.add(cb.equal(root.get("petPolicy"), PetPolicy.NOT_ALLOWED));
                 }
             }
 

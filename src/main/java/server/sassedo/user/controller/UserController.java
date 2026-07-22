@@ -232,7 +232,6 @@ public class UserController {
         response.setAge(user.getAge());
         response.setSex(user.getSex());
         response.setLanguages(user.getLanguages());
-        response.setJobStatus(user.getJobStatus());
         response.setProfession(user.getProfession());
         response.setSmokingPreference(user.getSmokingPreference());
         response.setPetPolicy(user.getPetPolicy());

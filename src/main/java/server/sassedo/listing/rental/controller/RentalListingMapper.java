@@ -3,6 +3,8 @@ package server.sassedo.listing.rental.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import server.sassedo.listing.common.PetPolicy;
+import server.sassedo.listing.common.matching.PreferenceMatcher;
 import server.sassedo.listing.rental.data.dto.RentalListing;
 import server.sassedo.listing.rental.data.network.response.RentalListingResponse;
 import server.sassedo.listing.rental.matching.RentalMatchScorer;
@@ -79,7 +81,6 @@ public class RentalListingMapper {
             r.setPromotionType(listing.getPromotionState().getPromotionType());
             r.setPromotionPriority(listing.getPromotionState().getPromotionPriority());
             r.setPromotedUntil(listing.getPromotionState().getPromotedUntil());
-            r.setPinned(listing.getPromotionState().isPinned());
         }
 
         // Read only photo id + main flag; loading listing.getPhotos() would pull every image
@@ -96,6 +97,15 @@ public class RentalListingMapper {
 
         if (user != null) {
             r.setMatchScore(matchScorer.score(user, listing));
+
+            // Rentals do not model "furnished" or room amenities; pets are derived from the pet policy.
+            Boolean petsAllowed = listing.getPetPolicy() != null
+                    ? listing.getPetPolicy() != PetPolicy.NOT_ALLOWED
+                    : null;
+            r.setPreferenceMatch(PreferenceMatcher.evaluate(user.getPreferences(),
+                    listing.getRent(), listing.getPropertyType(), null, petsAllowed,
+                    listing.getBedrooms(), listing.getBathrooms(), listing.getCity(),
+                    listing.getCountry(), null, listing.getNearbyAmenities()));
         }
         return r;
     }

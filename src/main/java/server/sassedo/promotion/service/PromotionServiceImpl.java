@@ -5,12 +5,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
 import server.sassedo.promotion.common.ListingType;
 import server.sassedo.promotion.common.PromotionSource;
 import server.sassedo.promotion.common.PromotionStatus;
-import server.sassedo.promotion.common.PromotionType;
 import server.sassedo.promotion.data.dto.Promotion;
 import server.sassedo.promotion.data.dto.PromotionPackage;
 import server.sassedo.promotion.data.network.request.GrantPromotionRequest;
@@ -43,13 +43,23 @@ public class PromotionServiceImpl implements PromotionService {
         promotion.setType(pkg.getType());
         promotion.setStatus(PromotionStatus.PENDING_PAYMENT);
         promotion.setSource(PromotionSource.PURCHASE);
-        promotion.setPinned(pkg.getType() == PromotionType.FEATURED && pkg.isPinnable());
+        return promotionRepository.save(promotion);
+    }
+
+    @Override
+    @Transactional
+    public Promotion linkPurchase(Promotion promotion, Long purchaseId) {
+        promotion.setPurchaseId(purchaseId);
         return promotionRepository.save(promotion);
     }
 
     @Override
     @Transactional
     public Promotion activate(Promotion promotion) throws GenericException {
+        // Idempotent: an already-active promotion must not restart its clock or double-apply.
+        if (promotion.getStatus() == PromotionStatus.ACTIVE) {
+            return promotion;
+        }
         PromotionPackage pkg = packageService.getById(promotion.getPackageId());
         LocalDateTime now = LocalDateTime.now();
         promotion.setStartDate(now);
@@ -57,8 +67,53 @@ public class PromotionServiceImpl implements PromotionService {
         promotion.setStatus(PromotionStatus.ACTIVE);
         Promotion saved = promotionRepository.save(promotion);
         listingService.applyPromotion(saved.getListingType(), saved.getListingId(), saved.getType(),
-                saved.getId(), saved.getStartDate(), saved.getEndDate(), saved.isPinned());
+                saved.getId(), saved.getStartDate(), saved.getEndDate());
         return saved;
+    }
+
+    @Override
+    @Transactional
+    public Promotion onPaymentCompleted(Promotion promotion) throws GenericException {
+        ListingStatus listingStatus = listingService.getListingStatus(
+                promotion.getListingType(), promotion.getListingId());
+        if (listingStatus == ListingStatus.ACTIVE) {
+            return activate(promotion);
+        }
+        // The listing is still awaiting approval: park the promotion as SCHEDULED with no dates
+        // so the time-based scheduler ignores it. It starts when the listing is approved.
+        promotion.setStartDate(null);
+        promotion.setEndDate(null);
+        promotion.setStatus(PromotionStatus.SCHEDULED);
+        return promotionRepository.save(promotion);
+    }
+
+    @Override
+    @Transactional
+    public void activateDeferredForListing(ListingType listingType, Long listingId) {
+        List<Promotion> deferred = promotionRepository.findByListingTypeAndListingIdAndStatus(
+                listingType, listingId, PromotionStatus.SCHEDULED);
+        for (Promotion promotion : deferred) {
+            // Only promotions parked for approval (no start date) should begin now; genuine
+            // future-dated promotions keep their own schedule.
+            if (promotion.getStartDate() == null) {
+                try {
+                    activate(promotion);
+                } catch (GenericException ignored) {
+                    // Missing package; leave the promotion for admin follow-up.
+                }
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void cancelDeferredForListing(ListingType listingType, Long listingId) {
+        List<Promotion> deferred = promotionRepository.findByListingTypeAndListingIdAndStatusIn(
+                listingType, listingId,
+                List.of(PromotionStatus.PENDING_PAYMENT, PromotionStatus.SCHEDULED));
+        for (Promotion promotion : deferred) {
+            terminate(promotion, PromotionStatus.CANCELLED);
+        }
     }
 
     @Override
@@ -81,12 +136,11 @@ public class PromotionServiceImpl implements PromotionService {
         promotion.setType(request.getType());
         promotion.setStatus(PromotionStatus.ACTIVE);
         promotion.setSource(PromotionSource.ADMIN_GRANT);
-        promotion.setPinned(request.getType() == PromotionType.FEATURED && request.isPinned());
         promotion.setStartDate(now);
         promotion.setEndDate(now.plusDays(request.getDurationDays()));
         Promotion saved = promotionRepository.save(promotion);
         listingService.applyPromotion(saved.getListingType(), saved.getListingId(), saved.getType(),
-                saved.getId(), saved.getStartDate(), saved.getEndDate(), saved.isPinned());
+                saved.getId(), saved.getStartDate(), saved.getEndDate());
         return saved;
     }
 
@@ -142,7 +196,7 @@ public class PromotionServiceImpl implements PromotionService {
             try {
                 listingService.applyPromotion(promotion.getListingType(), promotion.getListingId(),
                         promotion.getType(), promotion.getId(), promotion.getStartDate(),
-                        promotion.getEndDate(), promotion.isPinned());
+                        promotion.getEndDate());
             } catch (GenericException ignored) {
                 // Listing was removed; the promotion status is still advanced for audit.
             }
@@ -161,6 +215,27 @@ public class PromotionServiceImpl implements PromotionService {
             listingService.clearPromotion(promotion.getListingType(), promotion.getListingId());
         }
         return overdue.size();
+    }
+
+    @Override
+    @Transactional
+    public int activateApprovedDeferred() {
+        List<Promotion> deferred = promotionRepository.findByStatusAndStartDateIsNull(
+                PromotionStatus.SCHEDULED);
+        int activated = 0;
+        for (Promotion promotion : deferred) {
+            try {
+                ListingStatus listingStatus = listingService.getListingStatus(
+                        promotion.getListingType(), promotion.getListingId());
+                if (listingStatus == ListingStatus.ACTIVE) {
+                    activate(promotion);
+                    activated++;
+                }
+            } catch (GenericException ignored) {
+                // Listing removed or package missing; leave the promotion for audit.
+            }
+        }
+        return activated;
     }
 
     private void ensureListingNotPromoted(ListingType listingType, Long listingId) throws GenericException {

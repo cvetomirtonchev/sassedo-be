@@ -79,12 +79,14 @@ public class RentalListingController {
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate availableBy,
+            @RequestParam(required = false) Boolean availableAsap,
             @RequestParam(required = false) Integer minBedrooms,
             @RequestParam(required = false) Integer minBathrooms,
             @RequestParam(required = false) Boolean sharedBedroom,
             @RequestParam(required = false) Boolean sharedBathroom,
             @RequestParam(required = false) Set<LeaseTerm> leaseTerms,
             @RequestParam(required = false) Set<String> amenities,
+            @RequestParam(required = false) Boolean petsAllowed,
             @RequestParam(required = false) Integer minMatchScore,
             @RequestParam(defaultValue = "NEWEST") ListingSort sort,
             @RequestParam(defaultValue = "0") int page,
@@ -97,12 +99,14 @@ public class RentalListingController {
         filter.setMinPrice(minPrice);
         filter.setMaxPrice(maxPrice);
         filter.setAvailableBy(availableBy);
+        filter.setAvailableAsap(availableAsap);
         filter.setMinBedrooms(minBedrooms);
         filter.setMinBathrooms(minBathrooms);
         filter.setSharedBedroom(sharedBedroom);
         filter.setSharedBathroom(sharedBathroom);
         filter.setLeaseTerms(leaseTerms);
         filter.setAmenities(amenities);
+        filter.setPetsAllowed(petsAllowed);
 
         User user = resolveUser(getUserId(httpRequest, jwtUtils));
 

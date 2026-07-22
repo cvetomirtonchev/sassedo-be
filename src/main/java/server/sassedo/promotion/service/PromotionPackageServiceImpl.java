@@ -65,13 +65,13 @@ public class PromotionPackageServiceImpl implements PromotionPackageService {
     }
 
     private void apply(PromotionPackage pkg, PromotionPackageRequest request) {
-        pkg.setName(request.getName());
+        pkg.setNameEn(request.getNameEn());
+        pkg.setNameBg(request.getNameBg());
         pkg.setDescription(request.getDescription());
         pkg.setType(request.getType());
         pkg.setDurationDays(request.getDurationDays());
         pkg.setPriceCents(request.getPriceCents());
         pkg.setCurrency(request.getCurrency() != null ? request.getCurrency() : "EUR");
         pkg.setSortPriority(request.getSortPriority());
-        pkg.setPinnable(request.isPinnable());
     }
 }

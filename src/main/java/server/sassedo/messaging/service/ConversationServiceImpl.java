@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import server.sassedo.listing.rental.repository.RentalListingRepository;
 import server.sassedo.listing.roommate.repository.RoommateListingRepository;
-import server.sassedo.listing.search.repository.ApartmentSearchRepository;
 import server.sassedo.messaging.data.dto.Conversation;
 import server.sassedo.messaging.data.dto.ConversationParticipant;
 import server.sassedo.messaging.data.dto.ConversationSummary;
@@ -41,7 +40,6 @@ public class ConversationServiceImpl implements ConversationService {
     private final ApplicationEventPublisher eventPublisher;
     private final RentalListingRepository rentalRepository;
     private final RoommateListingRepository roommateRepository;
-    private final ApartmentSearchRepository searchRepository;
 
     @Override
     @Transactional
@@ -225,9 +223,6 @@ public class ConversationServiceImpl implements ConversationService {
                     .map(l -> new ListingContext(l.getOwnerId(), l.getTitle()))
                     .orElseThrow(this::listingNotFound);
             case ROOMMATE -> roommateRepository.findById(listingId)
-                    .map(l -> new ListingContext(l.getOwnerId(), l.getTitle()))
-                    .orElseThrow(this::listingNotFound);
-            case SEARCH -> searchRepository.findById(listingId)
                     .map(l -> new ListingContext(l.getOwnerId(), l.getTitle()))
                     .orElseThrow(this::listingNotFound);
         };

@@ -22,7 +22,8 @@ public final class PromotionMapper {
     public static PromotionPackageResponse toPackageResponse(PromotionPackage p) {
         PromotionPackageResponse r = new PromotionPackageResponse();
         r.setId(p.getId());
-        r.setName(p.getName());
+        r.setNameEn(p.getNameEn());
+        r.setNameBg(p.getNameBg());
         r.setDescription(p.getDescription());
         r.setType(p.getType());
         r.setDurationDays(p.getDurationDays());
@@ -30,7 +31,6 @@ public final class PromotionMapper {
         r.setCurrency(p.getCurrency());
         r.setActive(p.isActive());
         r.setSortPriority(p.getSortPriority());
-        r.setPinnable(p.isPinnable());
         return r;
     }
 
@@ -47,7 +47,6 @@ public final class PromotionMapper {
         r.setStartDate(p.getStartDate());
         r.setEndDate(p.getEndDate());
         r.setPurchaseId(p.getPurchaseId());
-        r.setPinned(p.isPinned());
         r.setCreatedAt(p.getCreatedAt());
         if (p.getStatus() == PromotionStatus.ACTIVE && p.getEndDate() != null) {
             long days = Duration.between(LocalDateTime.now(), p.getEndDate()).toDays();

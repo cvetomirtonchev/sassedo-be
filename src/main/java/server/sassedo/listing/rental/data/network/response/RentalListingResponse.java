@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import server.sassedo.engagement.service.EngagementAware;
 import server.sassedo.listing.common.*;
+import server.sassedo.listing.common.matching.PreferenceMatchResponse;
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
 import server.sassedo.promotion.common.PromotionType;
 
@@ -66,9 +67,12 @@ public class RentalListingResponse implements EngagementAware {
     private PromotionType promotionType;
     private int promotionPriority;
     private LocalDateTime promotedUntil;
-    private boolean pinned;
 
     private Integer matchScore;
+
+    // Which property details match the requesting user's saved preferences. Only populated for
+    // authenticated requests; null otherwise.
+    private PreferenceMatchResponse preferenceMatch;
 
     private long favoriteCount;
     private long viewCount;

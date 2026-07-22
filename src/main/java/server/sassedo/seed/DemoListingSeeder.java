@@ -13,7 +13,6 @@ import server.sassedo.listing.common.ExtraService;
 import server.sassedo.listing.common.LeaseTerm;
 import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.NearbyAmenity;
-import server.sassedo.listing.common.OccupationPreference;
 import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.PropertyAmenity;
 import server.sassedo.listing.common.PropertyType;
@@ -27,14 +26,11 @@ import server.sassedo.listing.rental.repository.RentalListingRepository;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.dto.RoommateListingPhoto;
 import server.sassedo.listing.roommate.repository.RoommateListingRepository;
-import server.sassedo.listing.search.data.dto.ApartmentSearch;
-import server.sassedo.listing.search.repository.ApartmentSearchRepository;
 import server.sassedo.location.data.dto.City;
 import server.sassedo.location.data.dto.Country;
 import server.sassedo.location.repository.CityRepository;
 import server.sassedo.location.repository.CountryRepository;
 import server.sassedo.user.data.dto.ERole;
-import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Role;
@@ -131,7 +127,6 @@ public class DemoListingSeeder implements ApplicationRunner {
     private final CityRepository cityRepository;
     private final RoommateListingRepository roommateListingRepository;
     private final RentalListingRepository rentalListingRepository;
-    private final ApartmentSearchRepository apartmentSearchRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${sassedo.listings.ttl-days:30}")
@@ -158,11 +153,10 @@ public class DemoListingSeeder implements ApplicationRunner {
         for (int i = 0; i < PER_TYPE; i++) {
             roommateListingRepository.save(buildRoommate(owners, cities, i));
             rentalListingRepository.save(buildRental(owners, cities, i));
-            apartmentSearchRepository.save(buildApartmentSearch(owners, cities, i));
         }
 
-        log.info("[demo-seed] Done. Created {} roommate, {} rental and {} apartment-search listings.",
-                PER_TYPE, PER_TYPE, PER_TYPE);
+        log.info("[demo-seed] Done. Created {} roommate and {} rental listings.",
+                PER_TYPE, PER_TYPE);
     }
 
     // ---- Reference data --------------------------------------------------
@@ -204,7 +198,6 @@ public class DemoListingSeeder implements ApplicationRunner {
             user.setAge(20 + (i % 25));
             user.setSex(pick(Sex.values()));
             user.setLanguages(new LinkedHashSet<>(List.of(Language.ENGLISH, Language.BULGARIAN)));
-            user.setJobStatus(pick(JobStatus.values()));
             user.setOccupation(pick(Occupation.values()));
             user.setSmokingPreference(pick(SmokerPreference.values()));
             user.setPetPolicy(pick(PetPolicy.values()));
@@ -274,6 +267,8 @@ public class DemoListingSeeder implements ApplicationRunner {
         setAvailability(index, l::setAvailableAsap, l::setAvailableFrom);
         l.setBedrooms(1 + random.nextInt(4));
         l.setBathrooms(1 + random.nextInt(3));
+        l.setSharedBedroom(random.nextBoolean());
+        l.setSharedBathroom(random.nextBoolean());
         l.setOwner(random.nextBoolean());
         l.setIncludedUtilities(randomSubset(Utility.values(), 1, 4));
         l.setExtraServices(randomSubset(ExtraService.values(), 0, 3));
@@ -288,14 +283,12 @@ public class DemoListingSeeder implements ApplicationRunner {
             l.setAgeMax(min + 5 + random.nextInt(15));
         }
         l.setSmokingPreference(maybe(0.7) ? pick(SmokerPreference.values()) : null);
-        l.setOccupationPreference(maybe(0.7) ? pick(OccupationPreference.values()) : null);
         l.setPetPolicy(maybe(0.7) ? pick(PetPolicy.values()) : null);
-        l.setEmploymentStatus(maybe(0.6) ? pick(JobStatus.values()) : null);
+        l.setEmploymentStatus(maybe(0.6) ? pick(Occupation.values()) : null);
         l.setSpokenLanguages(maybe(0.7)
                 ? randomSubset(new Language[]{Language.ENGLISH, Language.BULGARIAN, Language.GERMAN,
                 Language.SPANISH, Language.FRENCH}, 1, 2)
                 : new LinkedHashSet<>());
-        l.setPeopleInProperty(1 + random.nextInt(4));
         l.setAdditionalRequirements("Looking for a tidy, friendly roommate.");
         l.setAboutMe("I'm a demo lister who enjoys a calm home.");
 
@@ -336,31 +329,6 @@ public class DemoListingSeeder implements ApplicationRunner {
         l.setDescription("Demo rental listing for testing. Spacious property in a great location.");
         attachRentalPhotos(l);
         return l;
-    }
-
-    private ApartmentSearch buildApartmentSearch(List<User> owners, List<City> cities, int index) {
-        ApartmentSearch s = new ApartmentSearch();
-        s.setOwnerId(pick(owners).getId());
-        s.setStatus(ListingStatus.ACTIVE);
-        s.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
-        s.setPropertyType(pick(PropertyType.values()));
-        City city = pick(cities);
-        s.setCountry(city.getCountry());
-        s.setCity(city);
-        s.setNeighborhood(pick(NEIGHBORHOODS));
-        int budgetMin = 300 + random.nextInt(400);
-        s.setBudgetMin(BigDecimal.valueOf(budgetMin));
-        s.setBudgetMax(BigDecimal.valueOf(budgetMin + 200 + random.nextInt(800)));
-        setAvailability(index, s::setAvailableAsap, s::setAvailableFrom);
-        s.setLeaseTerms(randomSubset(LeaseTerm.values(), 1, 3));
-        s.setAge(20 + random.nextInt(30));
-        s.setSex(pick(Sex.values()));
-        s.setProfession(pick(new String[]{"Engineer", "Student", "Designer", "Teacher", "Nurse"}));
-        s.setSmoker(pick(SmokerPreference.values()));
-        s.setHasPets(random.nextBoolean());
-        s.setTitle(DEMO_MARKER + "Looking for a place in " + city.getNameEn() + " #" + (index + 1));
-        s.setDescription("Demo apartment search for testing. Responsible tenant looking for a home.");
-        return s;
     }
 
     // ---- Photos ----------------------------------------------------------

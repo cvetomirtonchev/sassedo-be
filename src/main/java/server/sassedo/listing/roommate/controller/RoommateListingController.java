@@ -34,8 +34,8 @@ import server.sassedo.listing.roommate.service.RoommateListingService;
 import server.sassedo.model.GenericException;
 import server.sassedo.promotion.common.ListingType;
 import server.sassedo.security.jwt.JwtUtils;
-import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 import server.sassedo.user.data.dto.User;
 import server.sassedo.user.service.user.UserService;
@@ -84,15 +84,18 @@ public class RoommateListingController {
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate availableBy,
+            @RequestParam(required = false) Boolean availableAsap,
             @RequestParam(required = false) Integer minBedrooms,
             @RequestParam(required = false) Integer minBathrooms,
+            @RequestParam(required = false) Boolean sharedBedroom,
+            @RequestParam(required = false) Boolean sharedBathroom,
             @RequestParam(required = false) Set<String> amenities,
             @RequestParam(required = false) Integer ageMin,
             @RequestParam(required = false) Integer ageMax,
             @RequestParam(required = false) Sex preferredSex,
             @RequestParam(required = false) Boolean petsAllowed,
             @RequestParam(required = false) SmokerPreference smokingPreference,
-            @RequestParam(required = false) JobStatus employmentStatus,
+            @RequestParam(required = false) Occupation employmentStatus,
             @RequestParam(required = false) Set<Language> spokenLanguages,
             @RequestParam(required = false) RoomArrangement roomArrangement,
             @RequestParam(required = false) Boolean hasChildren,
@@ -109,8 +112,11 @@ public class RoommateListingController {
         filter.setMinPrice(minPrice);
         filter.setMaxPrice(maxPrice);
         filter.setAvailableBy(availableBy);
+        filter.setAvailableAsap(availableAsap);
         filter.setMinBedrooms(minBedrooms);
         filter.setMinBathrooms(minBathrooms);
+        filter.setSharedBedroom(sharedBedroom);
+        filter.setSharedBathroom(sharedBathroom);
         filter.setAmenities(amenities);
         filter.setAgeMin(ageMin);
         filter.setAgeMax(ageMax);
@@ -228,6 +234,7 @@ public class RoommateListingController {
             RoommateListing listing = listingService.getViewableById(id, userId, isAdmin());
             RoommateListingResponse response = mapToResponse(listing, resolveUser(userId));
             enrichOwner(response, listing.getOwnerId());
+            mapper.enrichOwnerProfile(response, listing.getOwnerId());
             String visitorId = httpRequest.getHeader("X-Visitor-Id");
             listingViewService.recordView(ListingType.ROOMMATE, id, userId, visitorId, listing.getOwnerId());
             engagementEnricher.enrich(ListingType.ROOMMATE, response, userId, true);

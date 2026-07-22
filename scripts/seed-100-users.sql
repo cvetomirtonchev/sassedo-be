@@ -4,7 +4,7 @@
 --   * a unique email: seeduser1@sassedo.test ... seeduser100@sassedo.test
 --   * a shared BCrypt password hash for the plaintext password "Password123!"
 --     (Spring Security's BCryptPasswordEncoder accepts the $2y$ variant)
---   * a full profile (name, phone, age, sex, job status, smoking preference, pet policy, occupation, description)
+--   * a full profile (name, phone, age, sex, occupation, smoking preference, pet policy, description)
 --   * enabled = 1, blocked = 0, all consent flags accepted
 --   * the ROLE_USER role (looked up by name, not a hard-coded id)
 --   * two languages (ENGLISH + a rotated second language)
@@ -34,7 +34,6 @@ BEGIN
     DECLARE vCity VARCHAR(100);
     DECLARE vAge INT;
     DECLARE vSex VARCHAR(10);
-    DECLARE vJobStatus VARCHAR(20);
     DECLARE vSmokingPreference VARCHAR(20);
     DECLARE vPetPolicy VARCHAR(20);
     DECLARE vOccupation VARCHAR(20);
@@ -73,8 +72,6 @@ BEGIN
 
             SET vAge = 18 + MOD(i, 50);
             SET vSex = ELT(1 + MOD(i, 3), 'MALE', 'FEMALE', 'OTHER');
-            SET vJobStatus = ELT(1 + MOD(i, 5),
-                'EMPLOYED', 'SELF_EMPLOYED', 'STUDENT', 'UNEMPLOYED', 'OTHER');
             SET vSmokingPreference = ELT(1 + MOD(i, 3),
                 'SMOKER', 'NON_SMOKER', 'NO_PREFERENCE');
             SET vPetPolicy = ELT(1 + MOD(i, 4),
@@ -90,13 +87,13 @@ BEGIN
 
             INSERT INTO users (
                 email, password, name, first_name, last_name, phone, age,
-                sex, job_status, smoking_preference, pet_policy, occupation, short_description, enabled, blocked,
+                sex, smoking_preference, pet_policy, occupation, short_description, enabled, blocked,
                 is_terms_and_conditions_accepted, is_gdpr_accepted,
                 terms_and_conditions_accepted_at, gdpr_accepted_at,
                 is_marketing_consent_accepted, marketing_consent_accepted_at
             ) VALUES (
                 vEmail, vPassword, vName, vFirstName, vLastName, vPhone, vAge,
-                vSex, vJobStatus, vSmokingPreference, vPetPolicy, vOccupation, vShortDescription, 1, 0,
+                vSex, vSmokingPreference, vPetPolicy, vOccupation, vShortDescription, 1, 0,
                 1, 1,
                 NOW(), NOW(),
                 1, NOW()

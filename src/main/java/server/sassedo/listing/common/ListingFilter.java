@@ -2,8 +2,8 @@ package server.sassedo.listing.common;
 
 import lombok.Getter;
 import lombok.Setter;
-import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
+import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
 
 import java.math.BigDecimal;
@@ -28,6 +28,8 @@ public class ListingFilter {
     private BigDecimal minPrice;
     private BigDecimal maxPrice;
     private LocalDate availableBy;
+    // When true, restrict to listings marked available as soon as possible.
+    private Boolean availableAsap;
     private Integer minBedrooms;
     private Integer minBathrooms;
     private Set<LeaseTerm> leaseTerms;
@@ -40,14 +42,14 @@ public class ListingFilter {
     // Roommate pets: with-property maps to petsAllowed, without-property to petPolicy != NOT_ALLOWED.
     private Boolean petsAllowed;
     private SmokerPreference smokingPreference;
-    private JobStatus employmentStatus;
+    private Occupation employmentStatus;
     private Set<Language> spokenLanguages;
     // Roommate with-property: how the offered space is arranged.
     private RoomArrangement roomArrangement;
     // Roommate without-property lifestyle: whether the lister has children.
     private Boolean hasChildren;
 
-    // Rental-only: willingness to use a shared bedroom/bathroom.
+    // Rental and roommate with-property: willingness to use a shared bedroom/bathroom.
     private Boolean sharedBedroom;
     private Boolean sharedBathroom;
 }

@@ -3,12 +3,17 @@ package server.sassedo.listing.roommate.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import server.sassedo.listing.common.matching.PreferenceMatcher;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
+import server.sassedo.listing.roommate.data.network.response.OwnerProfileResponse;
 import server.sassedo.listing.roommate.data.network.response.RoommateListingResponse;
+import server.sassedo.listing.roommate.data.network.response.RoommateRequirementMatchResponse;
+import server.sassedo.listing.roommate.matching.RoommateMatchResult;
 import server.sassedo.listing.roommate.matching.RoommateMatchScorer;
 import server.sassedo.listing.roommate.repository.RoommateListingPhotoRepository;
 import server.sassedo.user.data.dto.User;
+import server.sassedo.user.data.projection.PublicProfileView;
 import server.sassedo.user.data.projection.UserParticipantSummary;
 import server.sassedo.user.service.user.UserService;
 
@@ -67,6 +72,8 @@ public class RoommateListingMapper {
         r.setAvailableAsap(listing.isAvailableAsap());
         r.setBedrooms(listing.getBedrooms());
         r.setBathrooms(listing.getBathrooms());
+        r.setSharedBedroom(listing.getSharedBedroom());
+        r.setSharedBathroom(listing.getSharedBathroom());
         r.setAreaSqm(listing.getAreaSqm());
         r.setRoomArrangement(listing.getRoomArrangement());
         r.setOwner(listing.getOwner());
@@ -81,10 +88,8 @@ public class RoommateListingMapper {
         r.setAgeMin(listing.getAgeMin());
         r.setAgeMax(listing.getAgeMax());
         r.setSmokingPreference(listing.getSmokingPreference());
-        r.setOccupationPreference(listing.getOccupationPreference());
         r.setAdditionalRequirements(listing.getAdditionalRequirements());
         r.setPetPolicy(listing.getPetPolicy());
-        r.setPeopleInProperty(listing.getPeopleInProperty());
         r.setSpokenLanguages(listing.getSpokenLanguages());
         r.setEmploymentStatus(listing.getEmploymentStatus());
         r.setHasChildren(listing.getHasChildren());
@@ -97,7 +102,6 @@ public class RoommateListingMapper {
             r.setPromotionType(listing.getPromotionState().getPromotionType());
             r.setPromotionPriority(listing.getPromotionState().getPromotionPriority());
             r.setPromotedUntil(listing.getPromotionState().getPromotedUntil());
-            r.setPinned(listing.getPromotionState().isPinned());
         }
 
         // Read only photo id + main flag; loading listing.getPhotos() would pull every image
@@ -113,7 +117,23 @@ public class RoommateListingMapper {
         }
 
         if (user != null) {
-            r.setMatchScore(matchScorer.score(user, listing));
+            RoommateMatchResult match = matchScorer.evaluate(user, listing);
+            r.setMatchScore(match.getScore());
+            RoommateRequirementMatchResponse requirementMatch = new RoommateRequirementMatchResponse();
+            requirementMatch.setSex(match.getSex());
+            requirementMatch.setAge(match.getAge());
+            requirementMatch.setSmoking(match.getSmoking());
+            requirementMatch.setPets(match.getPets());
+            requirementMatch.setEmployment(match.getEmployment());
+            requirementMatch.setLanguages(match.getLanguages());
+            requirementMatch.setMatchedLanguages(match.getMatchedLanguages());
+            r.setRequirementMatch(requirementMatch);
+
+            r.setPreferenceMatch(PreferenceMatcher.evaluate(user.getPreferences(),
+                    listing.getRent(), listing.getPropertyType(), listing.getFurnished(),
+                    listing.getPetsAllowed(), listing.getBedrooms(), listing.getBathrooms(),
+                    listing.getCity(), listing.getCountry(), listing.getRoomAmenities(),
+                    listing.getNearbyAmenities()));
         }
         return r;
     }
@@ -138,6 +158,43 @@ public class RoommateListingMapper {
         }
         response.setOwnerName(owner.getName());
         if (owner.getHasPhoto()) {
+            String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/api/user/")
+                    .path(String.valueOf(ownerId))
+                    .path("/picture")
+                    .toUriString();
+            response.setOwnerPhotoUrl(photoUrl);
+        }
+    }
+
+    /**
+     * Attaches the owner's publicly shareable profile (age, gender, pets, smoking, languages,
+     * employment, bio) to the detail response. Intended for the single-listing endpoint only, so
+     * list/card responses do not incur the extra lookups. Sets {@code ownerName}/{@code
+     * ownerPhotoUrl} as a fallback when they were not already enriched.
+     */
+    public void enrichOwnerProfile(RoommateListingResponse response, Long ownerId) {
+        if (ownerId == null) {
+            return;
+        }
+        PublicProfileView profile = userService.getPublicProfile(ownerId);
+        if (profile == null) {
+            return;
+        }
+        OwnerProfileResponse ownerProfile = new OwnerProfileResponse();
+        ownerProfile.setAge(profile.getAge());
+        ownerProfile.setSex(profile.getSex());
+        ownerProfile.setPetPolicy(profile.getPetPolicy());
+        ownerProfile.setSmokingPreference(profile.getSmokingPreference());
+        ownerProfile.setEmploymentStatus(profile.getOccupation());
+        ownerProfile.setAboutMe(profile.getShortDescription());
+        ownerProfile.setLanguages(userService.getUserLanguages(ownerId));
+        response.setOwnerProfile(ownerProfile);
+
+        if (response.getOwnerName() == null) {
+            response.setOwnerName(profile.getName());
+        }
+        if (response.getOwnerPhotoUrl() == null && profile.getHasPhoto()) {
             String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
                     .path("/api/user/")
                     .path(String.valueOf(ownerId))

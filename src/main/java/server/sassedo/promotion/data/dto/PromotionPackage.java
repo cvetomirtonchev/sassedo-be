@@ -17,8 +17,11 @@ public class PromotionPackage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String name;
+    @Column(name = "name_en", nullable = false, length = 120)
+    private String nameEn;
+
+    @Column(name = "name_bg", nullable = false, length = 120)
+    private String nameBg;
 
     @Column(length = 500)
     private String description;
@@ -41,9 +44,6 @@ public class PromotionPackage {
 
     @Column(name = "sort_priority", nullable = false)
     private int sortPriority = 0;
-
-    @Column(nullable = false)
-    private boolean pinnable = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

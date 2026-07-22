@@ -23,6 +23,11 @@ public interface PromotionRepository extends JpaRepository<Promotion, Long> {
     List<Promotion> findByListingTypeAndListingIdAndStatusIn(ListingType listingType, Long listingId,
                                                              List<PromotionStatus> statuses);
 
+    List<Promotion> findByListingTypeAndListingIdAndStatus(ListingType listingType, Long listingId,
+                                                           PromotionStatus status);
+
+    List<Promotion> findByStatusAndStartDateIsNull(PromotionStatus status);
+
     List<Promotion> findByStatusAndStartDateLessThanEqual(PromotionStatus status, LocalDateTime now);
 
     List<Promotion> findByStatusAndEndDateLessThanEqual(PromotionStatus status, LocalDateTime now);

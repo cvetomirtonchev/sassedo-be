@@ -49,6 +49,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
       SASSEDO_APP_JWTSECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       SASSEDO_SEED_DEMOLISTINGS_ENABLED: "true"
+      SASSEDO_PAYMENTS_PROVIDER: ${SASSEDO_PAYMENTS_PROVIDER:-mock}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      CLIENT_URL: ${CLIENT_URL:-https://sassedo-fe.vercel.app}
       # One-time maintenance toggle: when true, recompresses oversized image blobs already stored in
       # the DB on startup (idempotent). Set to true in .env, restart once, then set back to false.
       SASSEDO_SHRINK_LARGE_IMAGES: ${SASSEDO_SHRINK_LARGE_IMAGES:-false}

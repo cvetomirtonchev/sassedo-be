@@ -11,7 +11,6 @@ import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.common.RoomAmenity;
 import server.sassedo.listing.common.SmokerPreference;
-import server.sassedo.user.data.dto.JobStatus;
 import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Occupation;
 import server.sassedo.user.data.dto.Sex;
@@ -40,8 +39,6 @@ public class UpdateProfileRequest {
     private Sex sex;
 
     private Set<Language> languages;
-
-    private JobStatus jobStatus;
 
     @Size(max = 100)
     private String profession;

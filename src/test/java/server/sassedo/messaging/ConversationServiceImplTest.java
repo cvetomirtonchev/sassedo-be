@@ -11,7 +11,6 @@ import org.springframework.data.domain.PageRequest;
 import server.sassedo.listing.rental.data.dto.RentalListing;
 import server.sassedo.listing.rental.repository.RentalListingRepository;
 import server.sassedo.listing.roommate.repository.RoommateListingRepository;
-import server.sassedo.listing.search.repository.ApartmentSearchRepository;
 import server.sassedo.messaging.data.dto.Conversation;
 import server.sassedo.messaging.data.dto.ConversationParticipant;
 import server.sassedo.messaging.data.dto.Message;
@@ -56,8 +55,6 @@ class ConversationServiceImplTest {
     private RentalListingRepository rentalRepository;
     @Mock
     private RoommateListingRepository roommateRepository;
-    @Mock
-    private ApartmentSearchRepository searchRepository;
 
     @InjectMocks
     private ConversationServiceImpl service;

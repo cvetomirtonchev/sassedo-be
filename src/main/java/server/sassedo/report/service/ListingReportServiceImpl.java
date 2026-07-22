@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import server.sassedo.listing.rental.repository.RentalListingRepository;
 import server.sassedo.listing.roommate.repository.RoommateListingRepository;
-import server.sassedo.listing.search.repository.ApartmentSearchRepository;
 import server.sassedo.model.GenericException;
 import server.sassedo.model.GenericExceptionCode;
 import server.sassedo.promotion.common.ListingType;
@@ -23,7 +22,6 @@ public class ListingReportServiceImpl implements ListingReportService {
     private final ListingReportRepository reportRepository;
     private final RentalListingRepository rentalListingRepository;
     private final RoommateListingRepository roommateListingRepository;
-    private final ApartmentSearchRepository apartmentSearchRepository;
 
     @Override
     @Transactional
@@ -79,7 +77,6 @@ public class ListingReportServiceImpl implements ListingReportService {
         return switch (listingType) {
             case RENTAL -> rentalListingRepository.existsById(listingId);
             case ROOMMATE -> roommateListingRepository.existsById(listingId);
-            case SEARCH -> apartmentSearchRepository.existsById(listingId);
         };
     }
 }
