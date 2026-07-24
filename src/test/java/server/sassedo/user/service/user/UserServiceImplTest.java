@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -13,11 +14,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import server.sassedo.location.repository.CityRepository;
 import server.sassedo.location.repository.CountryRepository;
+import server.sassedo.user.data.dto.ERole;
+import server.sassedo.user.data.dto.Role;
 import server.sassedo.user.data.dto.User;
+import server.sassedo.user.data.network.request.RegisterRequest;
 import server.sassedo.user.repository.PasswordTokenRepository;
 import server.sassedo.user.repository.RoleRepository;
 import server.sassedo.user.repository.UserRepository;
 import server.sassedo.user.service.EmailVerificationService;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -43,6 +49,35 @@ class UserServiceImplTest {
 
     @InjectMocks
     private UserServiceImpl service;
+
+    @Test
+    void registerUser_persistsWithoutACodeAndSendsRegistrationSuccessEmail() throws Exception {
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail("new-user@example.com");
+        request.setPassword("secret123");
+        request.setFirstName("New");
+        request.setLastName("User");
+        request.setPhone("+359888123456");
+        request.setAcceptedTerms(true);
+        request.setAcceptedGdpr(true);
+
+        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
+        when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded-password");
+        when(roleRepository.findByName(ERole.ROLE_USER))
+                .thenReturn(Optional.of(new Role(ERole.ROLE_USER)));
+
+        service.registerUser(request, "http://localhost:8080");
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        User savedUser = userCaptor.getValue();
+
+        assertThat(savedUser.getVerificationCode()).isNull();
+        verify(emailVerificationService).sendRegistrationSuccess(
+                request.getEmail(),
+                "New User"
+        );
+    }
 
     @Test
     void searchUsers_detectsAnExactNumericIdAndCombinesItWithTheCityFilter() {

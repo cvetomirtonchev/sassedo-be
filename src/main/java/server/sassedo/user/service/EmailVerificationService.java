@@ -9,6 +9,7 @@ import java.util.Map;
 
 @Service
 public class EmailVerificationService {
+    private static final String REGISTRATION_SUCCESS_SUBJECT = "Успешна регистрация в Sassedo";
     private static final String VERIFICATION_SUBJECT = "Моля, потвърдете вашия имейл адрес:";
     private static final String PASSWORD_RESET_SUBJECT = "Потвърдете вашата заявка за смяна на парола";
 
@@ -16,6 +17,27 @@ public class EmailVerificationService {
 
     public EmailVerificationService(BrandedEmailSender emailSender) {
         this.emailSender = emailSender;
+    }
+
+    public void sendRegistrationSuccess(String email, String name)
+            throws MessagingException, UnsupportedEncodingException {
+        String plainTextContent = """
+                Здравейте, %s,
+
+                Регистрацията ви в Sassedo беше успешна.
+
+                За да активирате профила си, поискайте код за потвърждение в приложението.
+
+                Благодарим ви!
+                """.formatted(name);
+
+        emailSender.send(
+                email,
+                REGISTRATION_SUCCESS_SUBJECT,
+                plainTextContent,
+                "email/registration-success",
+                Map.of("name", name)
+        );
     }
 
     public void sendVerificationCode(String email, String name, String code)

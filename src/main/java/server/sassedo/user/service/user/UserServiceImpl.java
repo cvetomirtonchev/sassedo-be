@@ -1,7 +1,6 @@
 package server.sassedo.user.service.user;
 
 import lombok.RequiredArgsConstructor;
-import java.security.SecureRandom;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -51,8 +50,9 @@ public class UserServiceImpl implements UserService {
     private final CityRepository cityRepository;
 
     @Override
-    @Transactional
-    public void registerUser(RegisterRequest signUpRequest, String siteURL) throws GenericException {
+    @Transactional(rollbackFor = {MessagingException.class, UnsupportedEncodingException.class})
+    public void registerUser(RegisterRequest signUpRequest, String siteURL)
+            throws GenericException, MessagingException, UnsupportedEncodingException {
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
             throw new GenericException(GenericExceptionCode.EMAIL_ALREADY_EXISTS, "Error: Email is already in use!");
         }
@@ -72,7 +72,7 @@ public class UserServiceImpl implements UserService {
                 signUpRequest.getFirstName(),
                 signUpRequest.getLastName(),
                 signUpRequest.getPhone(),
-                generateRandomString(64),
+                null,
                 signUpRequest.isAcceptedTerms(),
                 signUpRequest.isAcceptedGdpr()
         );
@@ -83,6 +83,10 @@ public class UserServiceImpl implements UserService {
         user.setRoles(roles);
 
         userRepository.save(user);
+        emailVerificationService.sendRegistrationSuccess(
+                user.getEmail(),
+                user.getName()
+        );
     }
 
     @Override
@@ -493,16 +497,6 @@ public class UserServiceImpl implements UserService {
 
     private String generateVerificationCode() {
         return String.format("%06d", new Random().nextInt(1_000_000));
-    }
-
-    private static String generateRandomString(int length) {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        SecureRandom random = new SecureRandom();
-        StringBuilder sb = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            sb.append(chars.charAt(random.nextInt(chars.length())));
-        }
-        return sb.toString();
     }
 
     private boolean isTokenExpired(PasswordResetToken passToken) {

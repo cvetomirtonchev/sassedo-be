@@ -44,6 +44,36 @@ class EmailVerificationServiceTest {
     }
 
     @Test
+    void sendRegistrationSuccess_rendersBrandedEmailWithoutAVerificationCode() throws Exception {
+        emailVerificationService.sendRegistrationSuccess(
+                "new-user@example.com",
+                "Мария"
+        );
+
+        mimeMessage.saveChanges();
+        verify(mailSender).send(mimeMessage);
+        assertEnvelope(
+                "new-user@example.com",
+                "Успешна регистрация в Sassedo"
+        );
+
+        String plainText = findTextPart(mimeMessage, "text/plain");
+        String html = findTextPart(mimeMessage, "text/html");
+
+        assertThat(plainText)
+                .contains("Регистрацията ви в Sassedo беше успешна.")
+                .contains("поискайте код за потвърждение")
+                .doesNotContain("000000");
+        assertThat(html)
+                .contains("Успешна регистрация")
+                .contains("Мария")
+                .contains("Профилът ви в Sassedo беше създаден успешно.")
+                .contains("cid:sassedoLogo")
+                .doesNotContain("Вашият код за потвърждение е");
+        assertLogoPart();
+    }
+
+    @Test
     void sendVerificationCode_rendersBrandedMultipartEmailAndEscapesName() throws Exception {
         String unsafeName = "Иван <script>alert('x')</script>";
 
