@@ -19,15 +19,12 @@ public class AddHeroSlideRequest {
     @Size(max = 1000)
     private String subtitleEn;
 
-    @NotBlank
     @Size(max = 200)
     private String primaryCtaLabelBg;
 
-    @NotBlank
     @Size(max = 200)
     private String primaryCtaLabelEn;
 
-    @NotBlank
     @Size(max = 500)
     private String primaryCtaHref;
 

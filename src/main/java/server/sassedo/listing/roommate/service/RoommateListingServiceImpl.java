@@ -2,6 +2,7 @@ package server.sassedo.listing.roommate.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -9,7 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import server.sassedo.listing.common.ListingFilter;
+import server.sassedo.listing.common.ListingOwnerEditPolicy;
 import server.sassedo.listing.common.ListingStatus;
+import server.sassedo.listing.common.notification.ListingModerationDecisionEvent;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.dto.RoommateListingPhoto;
 import server.sassedo.listing.roommate.data.network.request.RoommateListingRequest;
@@ -42,6 +45,7 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     private final CountryRepository countryRepository;
     private final CityRepository cityRepository;
     private final PromotionService promotionService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${sassedo.listings.ttl-days:30}")
     private long listingTtlDays;
@@ -103,8 +107,21 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     }
 
     @Override
-    public Page<RoommateListing> adminSearch(ListingStatus status, String search, Pageable pageable) {
-        return listingRepository.adminSearch(status, search, pageable);
+    public Page<RoommateListing> adminSearch(ListingStatus status, String search, Long cityId, Pageable pageable) {
+        String normalizedSearch = search == null ? null : search.trim();
+        Long listingId = parseListingId(normalizedSearch);
+        return listingRepository.adminSearch(status, normalizedSearch, listingId, cityId, pageable);
+    }
+
+    private static Long parseListingId(String search) {
+        if (search == null || search.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(search);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     @Override
@@ -113,28 +130,47 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = GenericException.class)
     public RoommateListing update(Long id, Long ownerId, boolean admin, RoommateListingRequest request) throws GenericException {
-        RoommateListing listing = getById(id);
-        if (!admin && (ownerId == null || !ownerId.equals(listing.getOwnerId()))) {
+        if (admin) {
+            RoommateListing listing = getById(id);
+            applyRequest(listing, request);
+            return listingRepository.save(listing);
+        }
+        RoommateListing listing = listingRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new GenericException(GenericExceptionCode.LISTING_NOT_FOUND, "Listing not found"));
+        if (ownerId == null || !ownerId.equals(listing.getOwnerId())) {
             throw new GenericException(GenericExceptionCode.NOT_LISTING_OWNER, "You are not the owner of this listing");
         }
+        ListingOwnerEditPolicy.assertCanOwnerEdit(listing.getOwnerEditCount());
         applyRequest(listing, request);
-        // A user editing their own listing resets it to pending review; admins keep the current status.
-        if (!admin) {
-            listing.setStatus(ListingStatus.PENDING);
-        }
+        listing.setOwnerEditCount(listing.getOwnerEditCount() + 1);
+        listing.setStatus(ListingOwnerEditPolicy.statusAfterOwnerEdit(listing.getStatus()));
         return listingRepository.save(listing);
     }
 
     @Override
     @Transactional
-    public RoommateListing setStatus(Long id, ListingStatus status) throws GenericException {
+    public RoommateListing setStatus(Long id, ListingStatus status, String rejectionReason) throws GenericException {
         if (status == null) {
             throw new GenericException(GenericExceptionCode.INVALID_LISTING_STATUS, "Invalid listing status");
         }
-        RoommateListing listing = getById(id);
+        if (status == ListingStatus.REJECTED && (rejectionReason == null || rejectionReason.isBlank())) {
+            throw new GenericException(GenericExceptionCode.MODERATION_REASON_REQUIRED,
+                    "Rejection reason is required");
+        }
+        RoommateListing listing = listingRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new GenericException(
+                        GenericExceptionCode.LISTING_NOT_FOUND,
+                        "Listing not found"
+                ));
+        ListingStatus previousStatus = listing.getStatus();
         listing.setStatus(status);
+        if (status == ListingStatus.REJECTED) {
+            listing.setRejectionReason(rejectionReason.trim());
+        } else if (status == ListingStatus.ACTIVE) {
+            listing.setRejectionReason(null);
+        }
         if (status == ListingStatus.ACTIVE) {
             listing.setExpiresAt(LocalDateTime.now().plusDays(listingTtlDays));
         }
@@ -143,7 +179,31 @@ public class RoommateListingServiceImpl implements RoommateListingService {
             // Start any promotion that was paid for while the listing awaited approval.
             promotionService.activateDeferredForListing(ListingType.ROOMMATE, id);
         }
+        if (previousStatus != status
+                && (status == ListingStatus.ACTIVE || status == ListingStatus.REJECTED)) {
+            eventPublisher.publishEvent(new ListingModerationDecisionEvent(
+                    ListingType.ROOMMATE,
+                    saved.getId(),
+                    saved.getOwnerId(),
+                    saved.getTitle(),
+                    status,
+                    saved.getRejectionReason()
+            ));
+        }
         return saved;
+    }
+
+    @Override
+    @Transactional
+    public RoommateListing resubmit(Long id, Long ownerId) throws GenericException {
+        RoommateListing listing = requireOwner(id, ownerId);
+        if (listing.getStatus() != ListingStatus.REJECTED) {
+            throw new GenericException(GenericExceptionCode.INVALID_LISTING_STATUS,
+                    "Only rejected listings can be resubmitted");
+        }
+        listing.setStatus(ListingStatus.PENDING);
+        listing.setRejectionReason(null);
+        return listingRepository.save(listing);
     }
 
     @Override
@@ -185,9 +245,23 @@ public class RoommateListingServiceImpl implements RoommateListingService {
     @Override
     @Transactional
     public void delete(Long id) throws GenericException {
-        RoommateListing listing = getById(id);
+        deleteListing(getById(id));
+    }
+
+    @Override
+    @Transactional
+    public void deleteByOwner(Long id, Long ownerId) throws GenericException {
+        RoommateListing listing = requireOwner(id, ownerId);
+        if (listing.getStatus() != ListingStatus.EXPIRED) {
+            throw new GenericException(GenericExceptionCode.INVALID_LISTING_STATUS,
+                    "Only expired listings can be deleted");
+        }
+        deleteListing(listing);
+    }
+
+    private void deleteListing(RoommateListing listing) {
         // Release any promotion awaiting approval so it is not left blocking / orphaned.
-        promotionService.cancelDeferredForListing(ListingType.ROOMMATE, id);
+        promotionService.cancelDeferredForListing(ListingType.ROOMMATE, listing.getId());
         listingRepository.delete(listing);
     }
 
@@ -287,6 +361,7 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         listing.setAvailableAsap(request.isAvailableAsap());
         listing.setBedrooms(request.getBedrooms());
         listing.setBathrooms(request.getBathrooms());
+        listing.setPeopleInProperty(normalizePeopleInProperty(request.getPeopleInProperty()));
         listing.setSharedBedroom(request.getSharedBedroom());
         listing.setSharedBathroom(request.getSharedBathroom());
         listing.setAreaSqm(request.getAreaSqm());
@@ -363,6 +438,7 @@ public class RoommateListingServiceImpl implements RoommateListingService {
         listing.setAvailableAsap(request.isAvailableAsap());
         listing.setBedrooms(null);
         listing.setBathrooms(null);
+        listing.setPeopleInProperty(null);
         listing.setSharedBedroom(null);
         listing.setSharedBathroom(null);
         listing.setAreaSqm(null);
@@ -391,5 +467,17 @@ public class RoommateListingServiceImpl implements RoommateListingService {
 
         listing.setTitle(request.getTitle());
         listing.setDescription(request.getDescription());
+    }
+
+    private Integer normalizePeopleInProperty(Integer peopleInProperty) throws GenericException {
+        if (peopleInProperty == null) {
+            return null;
+        }
+        if (peopleInProperty < 0) {
+            throw new GenericException(GenericExceptionCode.INVALID_LISTING_STATE,
+                    "People in property cannot be negative");
+        }
+        // A legacy client sent the number of other occupants, where 0 meant only the lister.
+        return peopleInProperty == 0 ? 1 : peopleInProperty;
     }
 }

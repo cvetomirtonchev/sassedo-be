@@ -9,13 +9,10 @@ import server.sassedo.model.GenericException;
 import server.sassedo.report.data.dto.ListingReport;
 import server.sassedo.report.data.network.request.CreateListingReportRequest;
 import server.sassedo.report.data.network.request.UpdateReportStatusRequest;
-import server.sassedo.report.data.network.response.ListingReportResponse;
 import server.sassedo.report.service.ListingReportService;
 import server.sassedo.security.jwt.JwtUtils;
 
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static server.sassedo.utils.ServerUtils.getUserId;
 
@@ -26,6 +23,7 @@ import static server.sassedo.utils.ServerUtils.getUserId;
 public class ListingReportController {
 
     private final ListingReportService reportService;
+    private final ListingReportMapper reportMapper;
     private final JwtUtils jwtUtils;
 
     @PostMapping
@@ -33,7 +31,7 @@ public class ListingReportController {
         Long userId = getUserId(httpRequest, jwtUtils);
         try {
             ListingReport report = reportService.create(userId, request);
-            return ResponseEntity.ok(convertToResponse(report));
+            return ResponseEntity.ok(reportMapper.map(report));
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());
         }
@@ -41,11 +39,7 @@ public class ListingReportController {
 
     @GetMapping("/admin/all")
     public ResponseEntity<?> getAll() {
-        List<ListingReportResponse> reports = reportService.getAll()
-                .stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(reports);
+        return ResponseEntity.ok(reportMapper.mapAdmin(reportService.getAll()));
     }
 
     @GetMapping("/admin/open-count")
@@ -57,22 +51,9 @@ public class ListingReportController {
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @Valid @RequestBody UpdateReportStatusRequest request) {
         try {
             ListingReport report = reportService.updateStatus(id, request.getStatus());
-            return ResponseEntity.ok(convertToResponse(report));
+            return ResponseEntity.ok(reportMapper.mapAdmin(report));
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());
         }
-    }
-
-    private ListingReportResponse convertToResponse(ListingReport report) {
-        return new ListingReportResponse(
-                report.getId(),
-                report.getReporterUserId(),
-                report.getListingType(),
-                report.getListingId(),
-                report.getReason(),
-                report.getDetails(),
-                report.getStatus(),
-                report.getCreatedAt()
-        );
     }
 }

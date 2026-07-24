@@ -53,7 +53,10 @@ public class PurchaseServiceImpl implements PurchaseService {
                     "Promotions can only be purchased for pending or active listings");
         }
 
-        Promotion promotion = promotionService.createPending(buyerId, pkg,
+        Promotion promotion = request.getRenewFromPromotionId() != null
+                ? promotionService.createPendingRenewal(buyerId, pkg,
+                request.getListingType(), request.getListingId(), request.getRenewFromPromotionId())
+                : promotionService.createPending(buyerId, pkg,
                 request.getListingType(), request.getListingId());
 
         Purchase purchase = new Purchase();

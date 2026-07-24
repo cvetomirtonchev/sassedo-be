@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,14 +13,20 @@ import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.rental.data.dto.RentalListing;
 
+import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface RentalListingRepository extends JpaRepository<RentalListing, Long>,
         JpaSpecificationExecutor<RentalListing> {
 
     List<RentalListing> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM RentalListing l WHERE l.id = :id")
+    Optional<RentalListing> findByIdForUpdate(@Param("id") Long id);
 
     @Query(value = "SELECT * FROM rental_listings WHERE status = 'ACTIVE' ORDER BY RAND() LIMIT :limit",
             nativeQuery = true)
@@ -46,13 +53,25 @@ public interface RentalListingRepository extends JpaRepository<RentalListing, Lo
             "WHERE l.status = server.sassedo.listing.common.ListingStatus.ACTIVE AND l.expiresAt IS NULL")
     int backfillMissingExpiry(@Param("expiresAt") LocalDateTime expiresAt);
 
-    @Query("SELECT l FROM RentalListing l WHERE " +
+    @Modifying
+    @Query("UPDATE RentalListing l SET l.status = server.sassedo.listing.common.ListingStatus.EXPIRED, " +
+            "l.expiresAt = :now, l.updatedAt = :now " +
+            "WHERE l.ownerId = :ownerId AND l.status IN :statuses")
+    int expireByOwnerId(@Param("ownerId") Long ownerId,
+                        @Param("statuses") List<ListingStatus> statuses,
+                        @Param("now") LocalDateTime now);
+
+    @Query("SELECT l FROM RentalListing l LEFT JOIN l.city c WHERE " +
             "(:status IS NULL OR l.status = :status) " +
+            "AND (:cityId IS NULL OR c.id = :cityId) " +
             "AND (:search IS NULL OR :search = '' " +
+            "OR (:listingId IS NOT NULL AND l.id = :listingId) " +
             "OR LOWER(l.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(l.neighborhood) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<RentalListing> adminSearch(@Param("status") ListingStatus status,
                                     @Param("search") String search,
+                                    @Param("listingId") Long listingId,
+                                    @Param("cityId") Long cityId,
                                     Pageable pageable);
 
     @Query("SELECT l.city.id, COUNT(l) FROM RentalListing l WHERE " +

@@ -6,6 +6,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.SmokerPreference;
+import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.network.response.OwnerProfileResponse;
 import server.sassedo.listing.roommate.data.network.response.RoommateListingResponse;
 import server.sassedo.listing.roommate.matching.RoommateMatchScorer;
@@ -49,6 +50,18 @@ class RoommateListingMapperTest {
         when(p.getShortDescription()).thenReturn("Friendly and tidy.");
         when(p.getHasPhoto()).thenReturn(false);
         return p;
+    }
+
+    @Test
+    void mapPreservesTotalPeopleInProperty() {
+        RoommateListing listing = new RoommateListing();
+        listing.setId(10L);
+        listing.setPeopleInProperty(2);
+        when(photoRepository.findMetaByListingId(10L)).thenReturn(List.of());
+
+        RoommateListingResponse response = mapper().map(listing);
+
+        assertThat(response.getPeopleInProperty()).isEqualTo(2);
     }
 
     @Test

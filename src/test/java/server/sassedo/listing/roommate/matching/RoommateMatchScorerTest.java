@@ -2,6 +2,7 @@ package server.sassedo.listing.roommate.matching;
 
 import org.junit.jupiter.api.Test;
 import server.sassedo.listing.common.PetPolicy;
+import server.sassedo.listing.common.RoommateSexPreference;
 import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.user.data.dto.Language;
@@ -47,7 +48,7 @@ class RoommateMatchScorerTest {
     @Test
     void constraintsWithNoUserDataYieldsNullScoreAndNeutralStates() {
         RoommateListing listing = listing();
-        listing.setPreferredSex(Sex.FEMALE);
+        listing.setPreferredSex(RoommateSexPreference.FEMALE);
         listing.setAgeMin(20);
         listing.setAgeMax(30);
 
@@ -61,18 +62,53 @@ class RoommateMatchScorerTest {
     @Test
     void exactSexMatchIsExactAndMismatchIsNeutral() {
         RoommateListing exact = listing();
-        exact.setPreferredSex(Sex.FEMALE);
+        exact.setPreferredSex(RoommateSexPreference.FEMALE);
         User female = user();
         female.setSex(Sex.FEMALE);
         assertThat(scorer.evaluate(female, exact).getSex()).isEqualTo(RequirementMatchState.EXACT);
 
         RoommateListing mismatchListing = listing();
-        mismatchListing.setPreferredSex(Sex.FEMALE);
+        mismatchListing.setPreferredSex(RoommateSexPreference.FEMALE);
         User male = user();
         male.setSex(Sex.MALE);
         RoommateMatchResult mismatch = scorer.evaluate(male, mismatchListing);
         assertThat(mismatch.getSex()).isEqualTo(RequirementMatchState.NONE);
         assertThat(mismatch.getScore()).isEqualTo(0);
+    }
+
+    @Test
+    void noSexPreferenceIsExactForEveryProfileSexWithoutChangingTheScore() {
+        for (Sex sex : Sex.values()) {
+            RoommateListing listing = listing();
+            listing.setPreferredSex(RoommateSexPreference.NO_PREFERENCE);
+            listing.setEmploymentStatus(Occupation.WORKING);
+
+            User user = user();
+            user.setSex(sex);
+            user.setOccupation(Occupation.UNEMPLOYED);
+
+            RoommateMatchResult result = scorer.evaluate(user, listing);
+
+            assertThat(result.getSex()).isEqualTo(RequirementMatchState.EXACT);
+            assertThat(result.getEmployment()).isEqualTo(RequirementMatchState.NONE);
+            assertThat(result.getScore()).isEqualTo(0);
+        }
+    }
+
+    @Test
+    void noSexPreferenceAloneScoresHundredAndRequiresProfileSexForTheExactState() {
+        RoommateListing listing = listing();
+        listing.setPreferredSex(RoommateSexPreference.NO_PREFERENCE);
+
+        User userWithSex = user();
+        userWithSex.setSex(Sex.OTHER);
+        RoommateMatchResult withSex = scorer.evaluate(userWithSex, listing);
+        assertThat(withSex.getSex()).isEqualTo(RequirementMatchState.EXACT);
+        assertThat(withSex.getScore()).isEqualTo(100);
+
+        RoommateMatchResult withoutSex = scorer.evaluate(user(), listing);
+        assertThat(withoutSex.getSex()).isEqualTo(RequirementMatchState.NONE);
+        assertThat(withoutSex.getScore()).isEqualTo(100);
     }
 
     @Test
@@ -174,7 +210,7 @@ class RoommateMatchScorerTest {
     @Test
     void aggregateScoreIsUnchangedForACombinedProfile() {
         RoommateListing listing = listing();
-        listing.setPreferredSex(Sex.FEMALE);
+        listing.setPreferredSex(RoommateSexPreference.FEMALE);
         listing.setAgeMin(20);
         listing.setAgeMax(30);
         listing.setEmploymentStatus(Occupation.REMOTE_WORKER);

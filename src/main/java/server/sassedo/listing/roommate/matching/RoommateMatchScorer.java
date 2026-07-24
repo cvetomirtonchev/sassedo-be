@@ -2,6 +2,7 @@ package server.sassedo.listing.roommate.matching;
 
 import org.springframework.stereotype.Component;
 import server.sassedo.listing.common.PetPolicy;
+import server.sassedo.listing.common.RoommateSexPreference;
 import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.listing.common.matching.ListingMatchSupport;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
@@ -86,7 +87,12 @@ public class RoommateMatchScorer {
         boolean anyConstraint = false;
 
         // Sex
-        if (listing.getPreferredSex() != null) {
+        // An explicit no-preference choice is visible as a match, but stays out of the weighted score.
+        if (listing.getPreferredSex() == RoommateSexPreference.NO_PREFERENCE) {
+            if (user.getSex() != null) {
+                result.sex(RequirementMatchState.EXACT);
+            }
+        } else if (listing.getPreferredSex() != null) {
             anyConstraint = true;
             if (user.getSex() != null) {
                 double s = scoreSex(user.getSex(), listing.getPreferredSex());
@@ -270,8 +276,10 @@ public class RoommateMatchScorer {
         return RequirementMatchState.NONE;
     }
 
-    private double scoreSex(Sex userSex, Sex preferredSex) {
-        return userSex == preferredSex ? 1.0 : 0.0;
+    private double scoreSex(Sex userSex, RoommateSexPreference preferredSex) {
+        boolean matches = (userSex == Sex.MALE && preferredSex == RoommateSexPreference.MALE)
+                || (userSex == Sex.FEMALE && preferredSex == RoommateSexPreference.FEMALE);
+        return matches ? 1.0 : 0.0;
     }
 
     private double scoreAge(int age, Integer min, Integer max) {

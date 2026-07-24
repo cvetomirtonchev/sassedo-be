@@ -9,7 +9,6 @@ import server.sassedo.location.data.dto.Country;
 import server.sassedo.promotion.data.dto.PromotionState;
 import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Occupation;
-import server.sassedo.user.data.dto.Sex;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -99,6 +98,10 @@ public class RoommateListing {
 
     private Integer bathrooms;
 
+    /** Total people living in the property, including the listing owner. */
+    @Column(name = "people_in_property")
+    private Integer peopleInProperty;
+
     // Whether the offered bedroom/bathroom is shared. With-property only.
     @Column(name = "shared_bedroom")
     private Boolean sharedBedroom;
@@ -145,7 +148,7 @@ public class RoommateListing {
     // Step 4: roommate requirements
     @Enumerated(EnumType.STRING)
     @Column(name = "preferred_sex")
-    private Sex preferredSex;
+    private RoommateSexPreference preferredSex;
 
     @Column(name = "preferred_orientation")
     private String preferredOrientation;
@@ -205,6 +208,14 @@ public class RoommateListing {
      */
     @Column(name = "content_revision", nullable = false)
     private long contentRevision = 0L;
+
+    /** Successful owner PUT edits over the listing lifetime (admin edits do not increment). */
+    @Column(name = "owner_edit_count", nullable = false)
+    private int ownerEditCount = 0;
+
+    @Lob
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
 
     @PrePersist
     public void onCreate() {

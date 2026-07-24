@@ -47,6 +47,7 @@ public final class PromotionMapper {
         r.setStartDate(p.getStartDate());
         r.setEndDate(p.getEndDate());
         r.setPurchaseId(p.getPurchaseId());
+        r.setPredecessorPromotionId(p.getPredecessorPromotionId());
         r.setCreatedAt(p.getCreatedAt());
         if (p.getStatus() == PromotionStatus.ACTIVE && p.getEndDate() != null) {
             long days = Duration.between(LocalDateTime.now(), p.getEndDate()).toDays();

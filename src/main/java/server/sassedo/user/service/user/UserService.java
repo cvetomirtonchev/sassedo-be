@@ -62,7 +62,7 @@ public interface UserService {
 
     List<User> getAllUsers();
 
-    Page<User> searchUsers(String search, Pageable pageable);
+    Page<User> searchUsers(String search, Long cityId, Pageable pageable);
 
     void updatePassword(Long userId, UpdatePasswordRequest updatePasswordRequest) throws GenericException;
 
@@ -77,8 +77,6 @@ public interface UserService {
     User setBlocked(Long userId, boolean blocked) throws GenericException;
 
     void sendVerificationCode(String email) throws MessagingException, UnsupportedEncodingException;
-
-    void deleteUser(Long userId) throws GenericException;
 
     User updateUserPreferences(Long userId, UpdateUserPreferencesRequest request) throws GenericException;
 

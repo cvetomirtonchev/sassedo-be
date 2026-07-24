@@ -197,8 +197,21 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Page<User> searchUsers(String search, Pageable pageable) {
-        return userRepository.searchUsers(search, pageable);
+    public Page<User> searchUsers(String search, Long cityId, Pageable pageable) {
+        String normalizedSearch = search == null ? null : search.trim();
+        Long searchId = parseSearchId(normalizedSearch);
+        return userRepository.searchUsers(normalizedSearch, searchId, cityId, pageable);
+    }
+
+    private static Long parseSearchId(String search) {
+        if (search == null || search.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(search);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     @Override
@@ -315,7 +328,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public void sendVerificationCode(String email) throws MessagingException, UnsupportedEncodingException {
         User user = userRepository.findByEmail(email);
-        if (!user.isEnabled()) {
+        if (user != null && !user.isEnabled()) {
             // Generate a new code
             String code = generateVerificationCode();
             user.setVerificationCode(code);
@@ -447,6 +460,9 @@ public class UserServiceImpl implements UserService {
     public byte[] getProfilePhoto(Long userId) throws GenericException {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new GenericException(GenericExceptionCode.USER_NOT_FOUND, "User not found"));
+        if (user.getDeletedAt() != null || user.getProfilePhoto() == null || user.getProfilePhoto().length == 0) {
+            throw new GenericException(GenericExceptionCode.USER_NOT_FOUND, "Profile photo not found");
+        }
         return user.getProfilePhoto();
     }
 
@@ -473,12 +489,6 @@ public class UserServiceImpl implements UserService {
                         firstName == null ? "" : firstName.trim(),
                         lastName == null ? "" : lastName.trim())
                 .trim();
-    }
-
-    @Override
-    public void deleteUser(Long userId) throws GenericException {
-        User user = userRepository.findById(userId).orElseThrow(() -> new GenericException(GenericExceptionCode.USER_NOT_FOUND, "User not found"));
-        userRepository.delete(user);
     }
 
     private String generateVerificationCode() {

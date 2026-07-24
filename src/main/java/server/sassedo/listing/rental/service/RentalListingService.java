@@ -29,13 +29,15 @@ public interface RentalListingService {
 
     List<RentalListing> randomActive(int limit);
 
-    Page<RentalListing> adminSearch(ListingStatus status, String search, Pageable pageable);
+    Page<RentalListing> adminSearch(ListingStatus status, String search, Long cityId, Pageable pageable);
 
     List<RentalListing> getMyListings(Long ownerId);
 
     RentalListing update(Long id, Long ownerId, boolean admin, RentalListingRequest request) throws GenericException;
 
-    RentalListing setStatus(Long id, ListingStatus status) throws GenericException;
+    RentalListing setStatus(Long id, ListingStatus status, String rejectionReason) throws GenericException;
+
+    RentalListing resubmit(Long id, Long ownerId) throws GenericException;
 
     RentalListing renew(Long id, Long ownerId) throws GenericException;
 
@@ -44,6 +46,8 @@ public interface RentalListingService {
     RentalListing reactivate(Long id, Long ownerId) throws GenericException;
 
     void delete(Long id) throws GenericException;
+
+    void deleteByOwner(Long id, Long ownerId) throws GenericException;
 
     RentalListing addPhotos(Long listingId, Long ownerId, MultipartFile[] files, Integer mainIndex) throws GenericException, IOException;
 

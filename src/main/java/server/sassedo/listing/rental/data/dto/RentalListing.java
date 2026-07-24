@@ -135,6 +135,14 @@ public class RentalListing {
     @Embedded
     private PromotionState promotionState = new PromotionState();
 
+    /** Successful owner PUT edits over the listing lifetime (admin edits do not increment). */
+    @Column(name = "owner_edit_count", nullable = false)
+    private int ownerEditCount = 0;
+
+    @Lob
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @PrePersist
     public void onCreate() {
         this.createdAt = LocalDateTime.now();

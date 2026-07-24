@@ -86,6 +86,40 @@ public class PromotableListingServiceImpl implements PromotableListingService {
         }
     }
 
+    @Override
+    public Long getActivePromotionId(ListingType type, Long listingId) throws GenericException {
+        PromotionState promotionState = switch (type) {
+            case RENTAL -> state(rentalRepository.findById(listingId).orElseThrow(this::notFound)
+                    .getPromotionState());
+            case ROOMMATE -> state(roommateRepository.findById(listingId).orElseThrow(this::notFound)
+                    .getPromotionState());
+        };
+        return promotionState.getActivePromotionId();
+    }
+
+    @Override
+    @Transactional
+    public void clearPromotionIfActive(ListingType type, Long listingId, Long promotionId) {
+        switch (type) {
+            case RENTAL -> rentalRepository.findById(listingId).ifPresent(listing -> {
+                PromotionState state = state(listing.getPromotionState());
+                if (promotionId != null && promotionId.equals(state.getActivePromotionId())) {
+                    state.reset();
+                    listing.setPromotionState(state);
+                    rentalRepository.save(listing);
+                }
+            });
+            case ROOMMATE -> roommateRepository.findById(listingId).ifPresent(listing -> {
+                PromotionState state = state(listing.getPromotionState());
+                if (promotionId != null && promotionId.equals(state.getActivePromotionId())) {
+                    state.reset();
+                    listing.setPromotionState(state);
+                    roommateRepository.save(listing);
+                }
+            });
+        }
+    }
+
     private PromotionState state(PromotionState existing) {
         return existing != null ? existing : new PromotionState();
     }

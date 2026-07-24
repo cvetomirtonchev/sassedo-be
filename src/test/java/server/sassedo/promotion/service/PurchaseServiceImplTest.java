@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -106,5 +107,32 @@ class PurchaseServiceImplTest {
         verify(promotionService).createPending(anyLong(), any(), any(), anyLong());
         verify(promotionService).linkPurchase(promotion, 9L);
         verify(paymentService).startCheckout(any(Purchase.class), any(Promotion.class));
+    }
+
+    @Test
+    void create_withRenewFromPromotionId_usesRenewalPath() throws GenericException {
+        when(packageService.getById(5L)).thenReturn(activePackage());
+        when(listingService.getOwnerId(ListingType.ROOMMATE, 10L)).thenReturn(1L);
+        when(listingService.getListingStatus(ListingType.ROOMMATE, 10L))
+                .thenReturn(ListingStatus.ACTIVE);
+        CreatePurchaseRequest request = request();
+        request.setRenewFromPromotionId(77L);
+        Promotion promotion = new Promotion();
+        promotion.setId(2L);
+        when(promotionService.createPendingRenewal(eq(1L), any(), eq(ListingType.ROOMMATE), eq(10L), eq(77L)))
+                .thenReturn(promotion);
+        when(purchaseRepository.save(any())).thenAnswer(inv -> {
+            Purchase purchase = inv.getArgument(0);
+            purchase.setId(9L);
+            return purchase;
+        });
+        when(promotionService.linkPurchase(promotion, 9L)).thenReturn(promotion);
+        when(paymentService.startCheckout(any(), any()))
+                .thenReturn(new CheckoutOutcome(null, null, PaymentStatus.PENDING, promotion));
+
+        service.create(1L, request);
+
+        verify(promotionService).createPendingRenewal(eq(1L), any(), eq(ListingType.ROOMMATE), eq(10L), eq(77L));
+        verify(promotionService, never()).createPending(anyLong(), any(), any(), anyLong());
     }
 }

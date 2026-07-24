@@ -17,6 +17,7 @@ import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.PropertyAmenity;
 import server.sassedo.listing.common.PropertyType;
 import server.sassedo.listing.common.RoomAmenity;
+import server.sassedo.listing.common.RoommateSexPreference;
 import server.sassedo.listing.common.SmokerPreference;
 import server.sassedo.listing.common.SmokingPolicy;
 import server.sassedo.listing.common.Utility;
@@ -267,6 +268,7 @@ public class DemoListingSeeder implements ApplicationRunner {
         setAvailability(index, l::setAvailableAsap, l::setAvailableFrom);
         l.setBedrooms(1 + random.nextInt(4));
         l.setBathrooms(1 + random.nextInt(3));
+        l.setPeopleInProperty(1 + random.nextInt(4));
         l.setSharedBedroom(random.nextBoolean());
         l.setSharedBathroom(random.nextBoolean());
         l.setOwner(random.nextBoolean());
@@ -276,7 +278,7 @@ public class DemoListingSeeder implements ApplicationRunner {
         l.setRoomAmenities(randomSubset(RoomAmenity.values(), 1, 4));
 
         // Step 4 requirements - varied (and sometimes absent) so match scores spread out.
-        l.setPreferredSex(maybe(0.6) ? pick(Sex.values()) : null);
+        l.setPreferredSex(maybe(0.6) ? pick(RoommateSexPreference.values()) : null);
         if (maybe(0.7)) {
             int min = 18 + random.nextInt(15);
             l.setAgeMin(min);

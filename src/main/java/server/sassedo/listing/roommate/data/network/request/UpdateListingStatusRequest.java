@@ -11,4 +11,7 @@ public class UpdateListingStatusRequest {
 
     @NotNull
     private ListingStatus status;
+
+    /** Required when {@code status} is {@link ListingStatus#REJECTED}. Cleared on approval. */
+    private String rejectionReason;
 }

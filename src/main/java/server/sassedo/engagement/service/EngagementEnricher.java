@@ -44,13 +44,14 @@ public class EngagementEnricher {
 
         Map<Long, Long> favoriteCounts = favoriteService.counts(listingType, ids);
         Set<Long> favoritedByMe = favoriteService.favoritedIds(userId, listingType, ids);
+        Map<Long, Long> viewCounts = includeViewCount ? listingViewService.counts(listingType, ids) : Map.of();
 
         for (EngagementAware response : responses) {
             Long id = response.getId();
             response.setFavoriteCount(favoriteCounts.getOrDefault(id, 0L));
             response.setFavoritedByMe(favoritedByMe.contains(id));
             if (includeViewCount) {
-                response.setViewCount(listingViewService.count(listingType, id));
+                response.setViewCount(viewCounts.getOrDefault(id, 0L));
             }
         }
     }

@@ -22,4 +22,9 @@ public interface PromotableListingService {
                         LocalDateTime activatedAt, LocalDateTime until) throws GenericException;
 
     void clearPromotion(ListingType type, Long listingId);
+
+    Long getActivePromotionId(ListingType type, Long listingId) throws GenericException;
+
+    /** Downgrade listing tier only when {@code promotionId} is the current active promotion. */
+    void clearPromotionIfActive(ListingType type, Long listingId, Long promotionId);
 }

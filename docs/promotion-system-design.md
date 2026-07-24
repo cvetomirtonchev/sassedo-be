@@ -37,7 +37,8 @@ New backend module `server.sassedo.promotion`.
   currency, active, sortPriority, createdAt, updatedAt`.
 - **Promotion** — the lifecycle + audit record for a single promotion of a single listing.
   `id, listingType (RENTAL|ROOMMATE), listingId, ownerId, packageId, type, status,
-  startDate, endDate, purchaseId, source (PURCHASE|ADMIN_GRANT), createdAt, updatedAt`.
+  startDate, endDate, purchaseId, predecessorPromotionId (nullable queued renewal),
+  source (PURCHASE|ADMIN_GRANT), createdAt, updatedAt`.
   **Never hard-deleted** — history is retained for auditing.
 - **Purchase** — an order placed by a user for a package against a listing.
   `id, buyerId, packageId, listingType, listingId, amountCents, currency, status,
@@ -293,6 +294,9 @@ GET  /api/purchases/admin/all    (admin) all purchases (paged)
 // POST /api/purchases
 { "packageId": 3, "listingType": "RENTAL", "listingId": 42 }
 
+// Optional queued renewal after a live promotion (same listing):
+{ "packageId": 4, "listingType": "RENTAL", "listingId": 42, "renewFromPromotionId": 7 }
+
 // 200 OK  (MVP mock provider auto-completes payment)
 { "purchaseId": 10, "status": "COMPLETED", "checkoutUrl": "mock://checkout/10",
   "payment": { "id": 15, "provider": "MOCK", "status": "COMPLETED" },
@@ -476,6 +480,30 @@ while the listing is still hidden. This is modelled by **overloading `SCHEDULED`
 - Activation is idempotent (`activate` no-ops on an already-`ACTIVE` promotion) and the
   payment webhook only reacts to a `PENDING_PAYMENT` promotion, so duplicate or out-of-order
   webhooks and a concurrent approval cannot double-activate or restart the clock.
+
+### 6.2 Queued renewals (`renewFromPromotionId`)
+
+Owners may purchase the next promotion tier while the current one is still **ACTIVE** on an
+**ACTIVE** listing. The request sets optional `renewFromPromotionId`; the new `Promotion`
+stores `predecessorPromotionId` (nullable — also signals renewal intent).
+
+- **Purchase validation** — predecessor must be the buyer's own `ACTIVE` promotion on the
+  same listing with `endDate` in the future. Approval-deferred `SCHEDULED` rows (no live
+  tier) cannot be renewed. At most one `PENDING_PAYMENT` or `SCHEDULED` successor per
+  predecessor; the predecessor row is locked (`PESSIMISTIC_WRITE`) during creation.
+- **Regular purchases** — unchanged: any blocking promotion on the listing still rejects a
+  non-renewal purchase.
+- **After payment** — if the predecessor is still `ACTIVE` with a future `endDate`, the
+  successor becomes `SCHEDULED` with `startDate = predecessor.endDate` and
+  `endDate = start + package duration`; listing denormalized columns are untouched until
+  handoff. If the predecessor expired before async payment completes, the successor activates
+  immediately. If the predecessor was cancelled, pending successors are cancelled too.
+- **Scheduler** — activation (`startDate <= now`) still runs before expiry in each sweep.
+  Expiry/terminate clears listing tier **only** when `active_promotion_id` matches the
+  promotion being ended, so an expired predecessor cannot wipe a successor that already
+  went live and cancelling a future queued row does not downgrade the current tier.
+- **Cancel active** — also cancels any `PENDING_PAYMENT` / `SCHEDULED` successors (no
+  refund). Cancelling a queued successor alone leaves the predecessor listing state intact.
 
 ---
 

@@ -87,6 +87,27 @@ class HeroCarouselServiceImplTest {
     }
 
     @Test
+    void add_acceptsSlideWithoutCtas() throws GenericException {
+        AddHeroSlideRequest request = validAddRequest();
+        request.setPrimaryCtaLabelBg(null);
+        request.setPrimaryCtaLabelEn(null);
+        request.setPrimaryCtaHref(null);
+        request.setSecondaryCtaLabelBg(null);
+        request.setSecondaryCtaLabelEn(null);
+        request.setSecondaryCtaHref(null);
+        when(heroSlideRepository.save(any(HeroSlide.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        HeroSlide saved = service.add(request);
+
+        assertThat(saved.getPrimaryCtaLabelBg()).isNull();
+        assertThat(saved.getPrimaryCtaLabelEn()).isNull();
+        assertThat(saved.getPrimaryCtaHref()).isNull();
+        assertThat(saved.getSecondaryCtaLabelBg()).isNull();
+        assertThat(saved.getSecondaryCtaLabelEn()).isNull();
+        assertThat(saved.getSecondaryCtaHref()).isNull();
+    }
+
+    @Test
     void add_rejectsUnsafeCtaUrl() {
         AddHeroSlideRequest request = validAddRequest();
         request.setPrimaryCtaHref("javascript:alert(1)");
@@ -116,6 +137,28 @@ class HeroCarouselServiceImplTest {
         assertThat(updated.getTitleBg()).isEqualTo("bg");
         assertThat(updated.getPrimaryCtaHref()).isEqualTo("/old");
         assertThat(updated.isEnabled()).isFalse();
+    }
+
+    @Test
+    void update_clearsPrimaryCtaWithBlankValues() throws GenericException {
+        HeroSlide existing = new HeroSlide();
+        existing.setPrimaryCtaLabelBg("Търси");
+        existing.setPrimaryCtaLabelEn("Search");
+        existing.setPrimaryCtaHref("/search");
+        when(heroSlideRepository.findById(5L)).thenReturn(Optional.of(existing));
+        when(heroSlideRepository.save(any(HeroSlide.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateHeroSlideRequest request = new UpdateHeroSlideRequest();
+        request.setId(5L);
+        request.setPrimaryCtaLabelBg(" ");
+        request.setPrimaryCtaLabelEn("");
+        request.setPrimaryCtaHref("  ");
+
+        HeroSlide updated = service.update(request);
+
+        assertThat(updated.getPrimaryCtaLabelBg()).isNull();
+        assertThat(updated.getPrimaryCtaLabelEn()).isNull();
+        assertThat(updated.getPrimaryCtaHref()).isNull();
     }
 
     @Test

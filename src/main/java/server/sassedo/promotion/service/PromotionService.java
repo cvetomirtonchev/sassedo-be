@@ -18,6 +18,13 @@ public interface PromotionService {
     Promotion createPending(Long ownerId, PromotionPackage pkg, ListingType listingType, Long listingId)
             throws GenericException;
 
+    /**
+     * Create a PENDING_PAYMENT renewal queued after {@code renewFromPromotionId}. The predecessor
+     * row is locked for update to prevent duplicate concurrent renewals.
+     */
+    Promotion createPendingRenewal(Long ownerId, PromotionPackage pkg, ListingType listingType, Long listingId,
+                                   Long renewFromPromotionId) throws GenericException;
+
     /** Link the persisted purchase back to its pending promotion for audit and return-status lookup. */
     Promotion linkPurchase(Promotion promotion, Long purchaseId);
 
@@ -47,6 +54,9 @@ public interface PromotionService {
 
     /** Owner cancels their own active/scheduled promotion -> CANCELLED + downgrade. */
     Promotion cancel(Long promotionId, Long requesterId) throws GenericException;
+
+    /** Cancel every blocking promotion owned by a deleted account while retaining all rows. */
+    int cancelAllForOwner(Long ownerId);
 
     Promotion getById(Long id) throws GenericException;
 

@@ -8,7 +8,6 @@ import server.sassedo.listing.common.matching.PreferenceMatchResponse;
 import server.sassedo.promotion.common.PromotionType;
 import server.sassedo.user.data.dto.Language;
 import server.sassedo.user.data.dto.Occupation;
-import server.sassedo.user.data.dto.Sex;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -56,6 +55,8 @@ public class RoommateListingResponse implements EngagementAware {
     private boolean availableAsap;
     private Integer bedrooms;
     private Integer bathrooms;
+    // Total people living in the property, including the listing owner.
+    private Integer peopleInProperty;
     private Boolean sharedBedroom;
     private Boolean sharedBathroom;
     private Integer areaSqm;
@@ -67,7 +68,7 @@ public class RoommateListingResponse implements EngagementAware {
     private Set<NearbyAmenity> nearbyAmenities;
     private Set<RoomAmenity> roomAmenities;
 
-    private Sex preferredSex;
+    private RoommateSexPreference preferredSex;
     private String preferredOrientation;
     private Integer ageMin;
     private Integer ageMax;
@@ -104,4 +105,9 @@ public class RoommateListingResponse implements EngagementAware {
     private long favoriteCount;
     private long viewCount;
     private boolean favoritedByMe;
+
+    private int editCount;
+    private int maxEdits;
+    private int remainingEdits;
+    private String rejectionReason;
 }

@@ -2,6 +2,7 @@ package server.sassedo.promotion.service;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -16,12 +17,15 @@ import server.sassedo.promotion.repository.PromotionRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +64,7 @@ class PromotionServiceImplTest {
     @Test
     void onPaymentCompleted_activeListing_activatesImmediately() throws GenericException {
         Promotion promotion = promotion(PromotionStatus.PENDING_PAYMENT);
+        when(promotionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(promotion));
         when(listingService.getListingStatus(ListingType.ROOMMATE, 10L))
                 .thenReturn(ListingStatus.ACTIVE);
         when(packageService.getById(5L)).thenReturn(pkg());
@@ -77,6 +82,7 @@ class PromotionServiceImplTest {
     @Test
     void onPaymentCompleted_pendingListing_defersWithoutTouchingListing() throws GenericException {
         Promotion promotion = promotion(PromotionStatus.PENDING_PAYMENT);
+        when(promotionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(promotion));
         when(listingService.getListingStatus(ListingType.ROOMMATE, 10L))
                 .thenReturn(ListingStatus.PENDING);
         when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -147,8 +153,8 @@ class PromotionServiceImplTest {
 
         assertThat(pending.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
         assertThat(scheduled.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
-        // Only the scheduled one was "live" enough to have written listing state.
-        verify(listingService).clearPromotion(ListingType.ROOMMATE, 10L);
+        verify(listingService, never()).clearPromotion(any(), anyLong());
+        verify(listingService, never()).clearPromotionIfActive(any(), anyLong(), anyLong());
     }
 
     @Test
@@ -182,5 +188,230 @@ class PromotionServiceImplTest {
         assertThat(activated).isZero();
         assertThat(parked.getStatus()).isEqualTo(PromotionStatus.SCHEDULED);
         verify(packageService, never()).getById(anyLong());
+    }
+
+    @Test
+    void onRenewalPaymentCompleted_queuesAfterActivePredecessor() throws GenericException {
+        Promotion predecessor = promotion(PromotionStatus.ACTIVE);
+        predecessor.setId(99L);
+        LocalDateTime end = LocalDateTime.now().plusDays(5);
+        predecessor.setEndDate(end);
+
+        Promotion renewal = promotion(PromotionStatus.PENDING_PAYMENT);
+        renewal.setPredecessorPromotionId(99L);
+        when(promotionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(renewal));
+        when(promotionRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(predecessor));
+        when(packageService.getById(5L)).thenReturn(pkg());
+        when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Promotion result = service.onPaymentCompleted(renewal);
+
+        assertThat(result.getStatus()).isEqualTo(PromotionStatus.SCHEDULED);
+        assertThat(result.getStartDate()).isEqualTo(end);
+        assertThat(result.getEndDate()).isEqualTo(end.plusDays(7));
+        verify(listingService, never()).applyPromotion(any(), anyLong(), any(), anyLong(), any(), any());
+    }
+
+    @Test
+    void onRenewalPaymentCompleted_activatesImmediatelyWhenPredecessorExpired() throws GenericException {
+        Promotion predecessor = promotion(PromotionStatus.EXPIRED);
+        predecessor.setId(99L);
+        predecessor.setEndDate(LocalDateTime.now().minusDays(1));
+
+        Promotion renewal = promotion(PromotionStatus.PENDING_PAYMENT);
+        renewal.setPredecessorPromotionId(99L);
+        when(promotionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(renewal));
+        when(promotionRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(predecessor));
+        when(listingService.getListingStatus(ListingType.ROOMMATE, 10L))
+                .thenReturn(ListingStatus.ACTIVE);
+        when(packageService.getById(5L)).thenReturn(pkg());
+        when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Promotion result = service.onPaymentCompleted(renewal);
+
+        assertThat(result.getStatus()).isEqualTo(PromotionStatus.ACTIVE);
+        verify(listingService).applyPromotion(eq(ListingType.ROOMMATE), eq(10L), any(), any(), any(), any());
+    }
+
+    @Test
+    void cancelActivePromotion_cancelsQueuedSuccessorAndClearsListingIfActive() throws GenericException {
+        Promotion active = promotion(PromotionStatus.ACTIVE);
+        active.setOwnerId(42L);
+        Promotion queued = promotion(PromotionStatus.SCHEDULED);
+        queued.setId(8L);
+        queued.setPredecessorPromotionId(1L);
+        when(promotionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(active));
+        when(promotionRepository.findByPredecessorPromotionIdAndStatusIn(eq(1L), any()))
+                .thenReturn(List.of(queued));
+        when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.cancel(1L, 42L);
+
+        assertThat(active.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
+        assertThat(queued.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
+        verify(listingService).clearPromotionIfActive(ListingType.ROOMMATE, 10L, 1L);
+    }
+
+    @Test
+    void createPendingRenewal_locksAndCreatesSingleQueuedPurchase() throws GenericException {
+        Promotion predecessor = promotion(PromotionStatus.ACTIVE);
+        predecessor.setId(99L);
+        predecessor.setOwnerId(42L);
+        predecessor.setEndDate(LocalDateTime.now().plusDays(2));
+        when(promotionRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(predecessor));
+        when(listingService.getListingStatus(ListingType.ROOMMATE, 10L))
+                .thenReturn(ListingStatus.ACTIVE);
+        when(promotionRepository.findByListingTypeAndListingIdAndStatusIn(
+                eq(ListingType.ROOMMATE), eq(10L), any()))
+                .thenReturn(List.of(predecessor));
+        when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Promotion renewal = service.createPendingRenewal(
+                42L, pkg(), ListingType.ROOMMATE, 10L, 99L);
+
+        assertThat(renewal.getStatus()).isEqualTo(PromotionStatus.PENDING_PAYMENT);
+        assertThat(renewal.getPredecessorPromotionId()).isEqualTo(99L);
+        assertThat(renewal.getType()).isEqualTo(PromotionType.PROMOTED);
+        verify(promotionRepository).findByIdForUpdate(99L);
+    }
+
+    @Test
+    void createPendingRenewal_rejectsSecondQueuedRenewal() throws GenericException {
+        Promotion predecessor = promotion(PromotionStatus.ACTIVE);
+        predecessor.setId(99L);
+        predecessor.setOwnerId(42L);
+        predecessor.setEndDate(LocalDateTime.now().plusDays(2));
+        Promotion queued = promotion(PromotionStatus.SCHEDULED);
+        queued.setId(100L);
+        queued.setPredecessorPromotionId(99L);
+        when(promotionRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(predecessor));
+        when(listingService.getListingStatus(ListingType.ROOMMATE, 10L))
+                .thenReturn(ListingStatus.ACTIVE);
+        when(promotionRepository.findByListingTypeAndListingIdAndStatusIn(
+                eq(ListingType.ROOMMATE), eq(10L), any()))
+                .thenReturn(List.of(predecessor, queued));
+
+        assertThatThrownBy(() -> service.createPendingRenewal(
+                42L, pkg(), ListingType.ROOMMATE, 10L, 99L))
+                .isInstanceOf(GenericException.class)
+                .hasMessage("A renewal is already queued for this promotion");
+
+        verify(promotionRepository, never()).save(any());
+    }
+
+    @Test
+    void onRenewalPaymentCompleted_cancelsWhenPredecessorWasCancelled() throws GenericException {
+        Promotion predecessor = promotion(PromotionStatus.CANCELLED);
+        predecessor.setId(99L);
+        Promotion renewal = promotion(PromotionStatus.PENDING_PAYMENT);
+        renewal.setPredecessorPromotionId(99L);
+        when(promotionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(renewal));
+        when(promotionRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(predecessor));
+        when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Promotion result = service.onPaymentCompleted(renewal);
+
+        assertThat(result.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
+        verify(listingService, never()).applyPromotion(any(), anyLong(), any(), anyLong(), any(), any());
+    }
+
+    @Test
+    void cancelQueuedRenewal_doesNotClearCurrentListingPromotion() throws GenericException {
+        Promotion queued = promotion(PromotionStatus.SCHEDULED);
+        queued.setOwnerId(42L);
+        queued.setPredecessorPromotionId(99L);
+        when(promotionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(queued));
+        when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.cancel(1L, 42L);
+
+        assertThat(queued.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
+        verify(listingService, never()).clearPromotionIfActive(any(), anyLong(), anyLong());
+        verify(promotionRepository, never()).findByPredecessorPromotionIdAndStatusIn(anyLong(), any());
+    }
+
+    @Test
+    void onPaymentCompleted_doesNotReactivateACancelledPromotion() throws GenericException {
+        Promotion cancelled = promotion(PromotionStatus.CANCELLED);
+        when(promotionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(cancelled));
+
+        Promotion result = service.onPaymentCompleted(cancelled);
+
+        assertThat(result).isSameAs(cancelled);
+        assertThat(result.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
+        verify(promotionRepository, never()).save(any());
+        verify(listingService, never()).getListingStatus(any(), anyLong());
+        verify(listingService, never()).applyPromotion(any(), anyLong(), any(), anyLong(), any(), any());
+    }
+
+    @Test
+    void cancelAllForOwner_cancelsBlockingRowsAndPreservesTerminalHistory() {
+        Promotion active = promotion(PromotionStatus.ACTIVE);
+        active.setOwnerId(42L);
+        Promotion queued = promotion(PromotionStatus.SCHEDULED);
+        queued.setId(2L);
+        queued.setOwnerId(42L);
+        queued.setPredecessorPromotionId(1L);
+        Promotion pending = promotion(PromotionStatus.PENDING_PAYMENT);
+        pending.setId(3L);
+        pending.setOwnerId(42L);
+        Promotion expired = promotion(PromotionStatus.EXPIRED);
+        expired.setId(4L);
+        expired.setOwnerId(42L);
+        when(promotionRepository.findByOwnerIdAndStatusInForUpdate(eq(42L), any()))
+                .thenReturn(List.of(active, queued, pending));
+        when(promotionRepository.findByPredecessorPromotionIdAndStatusIn(eq(1L), any()))
+                .thenReturn(List.of(queued));
+        when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        int cancelled = service.cancelAllForOwner(42L);
+
+        assertThat(cancelled).isEqualTo(3);
+        assertThat(active.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
+        assertThat(queued.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
+        assertThat(pending.getStatus()).isEqualTo(PromotionStatus.CANCELLED);
+        assertThat(expired.getStatus()).isEqualTo(PromotionStatus.EXPIRED);
+        verify(listingService).clearPromotionIfActive(ListingType.ROOMMATE, 10L, 1L);
+    }
+
+    @Test
+    void expireOverdue_clearsListingOnlyWhenPromotionStillActiveOnListing() {
+        Promotion promotion = promotion(PromotionStatus.ACTIVE);
+        promotion.setEndDate(LocalDateTime.now().minusHours(1));
+        when(promotionRepository.findByStatusAndEndDateLessThanEqual(eq(PromotionStatus.ACTIVE), any()))
+                .thenReturn(List.of(promotion));
+        when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.expireOverdue(LocalDateTime.now());
+
+        verify(listingService).clearPromotionIfActive(ListingType.ROOMMATE, 10L, 1L);
+    }
+
+    @Test
+    void scheduledSuccessorActivatesBeforeExpiredPredecessorIsConditionallyCleared() throws GenericException {
+        LocalDateTime now = LocalDateTime.now();
+        Promotion predecessor = promotion(PromotionStatus.ACTIVE);
+        predecessor.setEndDate(now.minusSeconds(1));
+        Promotion successor = promotion(PromotionStatus.SCHEDULED);
+        successor.setId(2L);
+        successor.setPredecessorPromotionId(1L);
+        successor.setStartDate(now.minusSeconds(1));
+        successor.setEndDate(now.plusDays(7));
+        when(promotionRepository.findByStatusAndStartDateLessThanEqual(PromotionStatus.SCHEDULED, now))
+                .thenReturn(List.of(successor));
+        when(promotionRepository.findByStatusAndEndDateLessThanEqual(PromotionStatus.ACTIVE, now))
+                .thenReturn(List.of(predecessor));
+        when(promotionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.activateScheduled(now);
+        service.expireOverdue(now);
+
+        assertThat(successor.getStatus()).isEqualTo(PromotionStatus.ACTIVE);
+        assertThat(predecessor.getStatus()).isEqualTo(PromotionStatus.EXPIRED);
+        InOrder handoff = inOrder(listingService);
+        handoff.verify(listingService).applyPromotion(
+                ListingType.ROOMMATE, 10L, PromotionType.PROMOTED, 2L,
+                successor.getStartDate(), successor.getEndDate());
+        handoff.verify(listingService).clearPromotionIfActive(ListingType.ROOMMATE, 10L, 1L);
     }
 }

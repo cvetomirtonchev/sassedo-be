@@ -24,6 +24,7 @@ public class PromotionResponse {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Long purchaseId;
+    private Long predecessorPromotionId;
     private LocalDateTime createdAt;
 
     /** Whole days remaining until expiration, floored at 0. Null when not active. */

@@ -17,4 +17,7 @@ public class CreatePurchaseRequest {
 
     @NotNull
     private Long listingId;
+
+    /** Optional: queue a renewal after this active promotion (same listing). */
+    private Long renewFromPromotionId;
 }

@@ -8,6 +8,10 @@ import server.sassedo.engagement.data.dto.ListingView;
 import server.sassedo.engagement.repository.ListingViewRepository;
 import server.sassedo.promotion.common.ListingType;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class ListingViewService {
@@ -47,6 +51,19 @@ public class ListingViewService {
     @Transactional(readOnly = true)
     public long count(ListingType listingType, Long listingId) {
         return listingViewRepository.countByListingTypeAndListingId(listingType, listingId);
+    }
+
+    /** Batch view counts keyed by listing id (missing ids imply zero). */
+    @Transactional(readOnly = true)
+    public Map<Long, Long> counts(ListingType listingType, Collection<Long> listingIds) {
+        Map<Long, Long> result = new HashMap<>();
+        if (listingIds == null || listingIds.isEmpty()) {
+            return result;
+        }
+        for (Object[] row : listingViewRepository.countByListingIds(listingType, listingIds)) {
+            result.put((Long) row[0], (Long) row[1]);
+        }
+        return result;
     }
 
     private String resolveViewerKey(Long userId, String visitorId) {

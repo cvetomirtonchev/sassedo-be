@@ -29,13 +29,15 @@ public interface RoommateListingService {
 
     List<RoommateListing> randomActive(int limit);
 
-    Page<RoommateListing> adminSearch(ListingStatus status, String search, Pageable pageable);
+    Page<RoommateListing> adminSearch(ListingStatus status, String search, Long cityId, Pageable pageable);
 
     List<RoommateListing> getMyListings(Long ownerId);
 
     RoommateListing update(Long id, Long ownerId, boolean admin, RoommateListingRequest request) throws GenericException;
 
-    RoommateListing setStatus(Long id, ListingStatus status) throws GenericException;
+    RoommateListing setStatus(Long id, ListingStatus status, String rejectionReason) throws GenericException;
+
+    RoommateListing resubmit(Long id, Long ownerId) throws GenericException;
 
     RoommateListing renew(Long id, Long ownerId) throws GenericException;
 
@@ -44,6 +46,8 @@ public interface RoommateListingService {
     RoommateListing reactivate(Long id, Long ownerId) throws GenericException;
 
     void delete(Long id) throws GenericException;
+
+    void deleteByOwner(Long id, Long ownerId) throws GenericException;
 
     RoommateListing addPhotos(Long listingId, Long ownerId, MultipartFile[] files, Integer mainIndex) throws GenericException, IOException;
 

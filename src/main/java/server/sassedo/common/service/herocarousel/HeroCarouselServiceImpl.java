@@ -73,7 +73,7 @@ public class HeroCarouselServiceImpl implements HeroCarouselService {
     @Override
     @Transactional
     public HeroSlide add(AddHeroSlideRequest request) throws GenericException {
-        validateCtaUrl(request.getPrimaryCtaHref());
+        validateOptionalCtaUrl(request.getPrimaryCtaHref());
         validateOptionalCtaUrl(request.getSecondaryCtaHref());
 
         HeroSlide slide = new HeroSlide();
@@ -81,12 +81,12 @@ public class HeroCarouselServiceImpl implements HeroCarouselService {
         slide.setTitleEn(trim(request.getTitleEn()));
         slide.setSubtitleBg(trim(request.getSubtitleBg()));
         slide.setSubtitleEn(trim(request.getSubtitleEn()));
-        slide.setPrimaryCtaLabelBg(trim(request.getPrimaryCtaLabelBg()));
-        slide.setPrimaryCtaLabelEn(trim(request.getPrimaryCtaLabelEn()));
-        slide.setPrimaryCtaHref(trim(request.getPrimaryCtaHref()));
-        slide.setSecondaryCtaLabelBg(trim(request.getSecondaryCtaLabelBg()));
-        slide.setSecondaryCtaLabelEn(trim(request.getSecondaryCtaLabelEn()));
-        slide.setSecondaryCtaHref(trim(request.getSecondaryCtaHref()));
+        slide.setPrimaryCtaLabelBg(trimToNull(request.getPrimaryCtaLabelBg()));
+        slide.setPrimaryCtaLabelEn(trimToNull(request.getPrimaryCtaLabelEn()));
+        slide.setPrimaryCtaHref(trimToNull(request.getPrimaryCtaHref()));
+        slide.setSecondaryCtaLabelBg(trimToNull(request.getSecondaryCtaLabelBg()));
+        slide.setSecondaryCtaLabelEn(trimToNull(request.getSecondaryCtaLabelEn()));
+        slide.setSecondaryCtaHref(trimToNull(request.getSecondaryCtaHref()));
         slide.setSortOrder(request.getSortOrder());
         slide.setEnabled(request.getEnabled() == null || request.getEnabled());
         return heroSlideRepository.save(slide);
@@ -109,24 +109,24 @@ public class HeroCarouselServiceImpl implements HeroCarouselService {
             slide.setSubtitleEn(request.getSubtitleEn().trim());
         }
         if (request.getPrimaryCtaLabelBg() != null) {
-            slide.setPrimaryCtaLabelBg(request.getPrimaryCtaLabelBg().trim());
+            slide.setPrimaryCtaLabelBg(trimToNull(request.getPrimaryCtaLabelBg()));
         }
         if (request.getPrimaryCtaLabelEn() != null) {
-            slide.setPrimaryCtaLabelEn(request.getPrimaryCtaLabelEn().trim());
+            slide.setPrimaryCtaLabelEn(trimToNull(request.getPrimaryCtaLabelEn()));
         }
         if (request.getPrimaryCtaHref() != null) {
-            validateCtaUrl(request.getPrimaryCtaHref());
-            slide.setPrimaryCtaHref(request.getPrimaryCtaHref().trim());
+            validateOptionalCtaUrl(request.getPrimaryCtaHref());
+            slide.setPrimaryCtaHref(trimToNull(request.getPrimaryCtaHref()));
         }
         if (request.getSecondaryCtaLabelBg() != null) {
-            slide.setSecondaryCtaLabelBg(request.getSecondaryCtaLabelBg().trim());
+            slide.setSecondaryCtaLabelBg(trimToNull(request.getSecondaryCtaLabelBg()));
         }
         if (request.getSecondaryCtaLabelEn() != null) {
-            slide.setSecondaryCtaLabelEn(request.getSecondaryCtaLabelEn().trim());
+            slide.setSecondaryCtaLabelEn(trimToNull(request.getSecondaryCtaLabelEn()));
         }
         if (request.getSecondaryCtaHref() != null) {
             validateOptionalCtaUrl(request.getSecondaryCtaHref());
-            slide.setSecondaryCtaHref(request.getSecondaryCtaHref().trim());
+            slide.setSecondaryCtaHref(trimToNull(request.getSecondaryCtaHref()));
         }
         if (request.getSortOrder() != null) {
             slide.setSortOrder(request.getSortOrder());
@@ -195,6 +195,11 @@ public class HeroCarouselServiceImpl implements HeroCarouselService {
 
     private static String trim(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private static String trimToNull(String value) {
+        String trimmed = trim(value);
+        return trimmed == null || trimmed.isEmpty() ? null : trimmed;
     }
 
     /**

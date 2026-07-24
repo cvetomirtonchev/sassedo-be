@@ -1,0 +1,49 @@
+<!doctype html><meta charset="UTF-8">
+<html
+        lang="bg"
+        xmlns:th="http://www.thymeleaf.org"
+        th:replace="~{email/layout :: layout(
+            'Обявата ви е одобрена',
+            'Обявата ви беше одобрена и вече е активна в Sassedo.',
+            ~{::main}
+        )}"
+>
+<body>
+<main style="display: block;">
+    <h1
+            class="email-title"
+            style="margin: 0 0 24px; color: #0a0a0a; font-size: 24px; font-weight: 500; line-height: 1.3;"
+    >
+        Обявата ви е одобрена
+    </h1>
+    <p style="margin: 0 0 16px; color: #0a0a0a; font-size: 16px; line-height: 1.5;">
+        Здравейте, <strong th:text="${name}" style="font-weight: 500;">Име</strong>,
+    </p>
+    <p style="margin: 0 0 16px; color: #0a0a0a; font-size: 16px; line-height: 1.5;">
+        Вашата обява
+        <strong th:text="${listingTitle}" style="font-weight: 500;">Заглавие на обявата</strong>
+        беше одобрена и вече е активна.
+    </p>
+    <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            border="0"
+            style="width: 100%; margin: 24px 0 0; border-collapse: separate;"
+    >
+        <tr>
+            <td align="center">
+                <a
+                        th:href="${listingUrl}"
+                        href="https://sassedo.com/"
+                        style="display: inline-block; padding: 13px 24px; background-color: #033c24; border-radius: 8px; color: #ffffff; font-size: 16px; font-weight: 500; line-height: 1.25; text-decoration: none;"
+                >
+                    Разгледайте обявата
+                </a>
+            </td>
+        </tr>
+    </table>
+</main>
+</body>
+</html>

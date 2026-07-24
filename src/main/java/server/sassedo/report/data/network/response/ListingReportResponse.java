@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
 public class ListingReportResponse {
     private Long id;
     private Long reporterUserId;
+    private String reporterName;
+    private String reporterEmail;
     private ListingType listingType;
     private Long listingId;
     private ReportReason reason;

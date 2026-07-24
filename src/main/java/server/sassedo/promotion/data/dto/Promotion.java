@@ -21,7 +21,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_promo_status_end", columnList = "status, end_date"),
         @Index(name = "idx_promo_status_start", columnList = "status, start_date"),
         @Index(name = "idx_promo_listing", columnList = "listing_type, listing_id"),
-        @Index(name = "idx_promo_owner", columnList = "owner_id")
+        @Index(name = "idx_promo_owner", columnList = "owner_id"),
+        @Index(name = "idx_promo_predecessor", columnList = "predecessor_promotion_id")
 })
 public class Promotion {
 
@@ -62,6 +63,10 @@ public class Promotion {
 
     @Column(name = "purchase_id")
     private Long purchaseId;
+
+    /** When set, this promotion is a queued renewal that hands off after the predecessor ends. */
+    @Column(name = "predecessor_promotion_id")
+    private Long predecessorPromotionId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

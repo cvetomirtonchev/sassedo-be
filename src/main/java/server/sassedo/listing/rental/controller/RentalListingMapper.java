@@ -3,6 +3,7 @@ package server.sassedo.listing.rental.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import server.sassedo.listing.common.ListingOwnerEditPolicy;
 import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.matching.PreferenceMatcher;
 import server.sassedo.listing.rental.data.dto.RentalListing;
@@ -41,6 +42,7 @@ public class RentalListingMapper {
         r.setCreatedAt(listing.getCreatedAt());
         r.setUpdatedAt(listing.getUpdatedAt());
         r.setExpiresAt(listing.getExpiresAt());
+        mapEditFields(listing, r);
         r.setPropertyType(listing.getPropertyType());
 
         if (listing.getCountry() != null) {
@@ -108,6 +110,13 @@ public class RentalListingMapper {
                     listing.getCountry(), null, listing.getNearbyAmenities()));
         }
         return r;
+    }
+
+    private static void mapEditFields(RentalListing listing, RentalListingResponse r) {
+        r.setEditCount(listing.getOwnerEditCount());
+        r.setMaxEdits(ListingOwnerEditPolicy.MAX_OWNER_EDITS);
+        r.setRemainingEdits(ListingOwnerEditPolicy.remainingEdits(listing.getOwnerEditCount()));
+        r.setRejectionReason(listing.getRejectionReason());
     }
 
     public String buildPhotoUrl(Long photoId) {

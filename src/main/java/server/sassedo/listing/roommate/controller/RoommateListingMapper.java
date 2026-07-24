@@ -3,6 +3,7 @@ package server.sassedo.listing.roommate.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import server.sassedo.listing.common.ListingOwnerEditPolicy;
 import server.sassedo.listing.common.matching.PreferenceMatcher;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
 import server.sassedo.listing.roommate.data.network.response.ListingPhotoResponse;
@@ -44,6 +45,7 @@ public class RoommateListingMapper {
         r.setCreatedAt(listing.getCreatedAt());
         r.setUpdatedAt(listing.getUpdatedAt());
         r.setExpiresAt(listing.getExpiresAt());
+        mapEditFields(listing, r);
         // Treat a null column (rows predating this feature) as "has property".
         r.setHasProperty(listing.getHasProperty() == null || listing.getHasProperty());
         r.setBudget(listing.getBudget());
@@ -72,6 +74,7 @@ public class RoommateListingMapper {
         r.setAvailableAsap(listing.isAvailableAsap());
         r.setBedrooms(listing.getBedrooms());
         r.setBathrooms(listing.getBathrooms());
+        r.setPeopleInProperty(listing.getPeopleInProperty());
         r.setSharedBedroom(listing.getSharedBedroom());
         r.setSharedBathroom(listing.getSharedBathroom());
         r.setAreaSqm(listing.getAreaSqm());
@@ -136,6 +139,13 @@ public class RoommateListingMapper {
                     listing.getNearbyAmenities()));
         }
         return r;
+    }
+
+    private static void mapEditFields(RoommateListing listing, RoommateListingResponse r) {
+        r.setEditCount(listing.getOwnerEditCount());
+        r.setMaxEdits(ListingOwnerEditPolicy.MAX_OWNER_EDITS);
+        r.setRemainingEdits(ListingOwnerEditPolicy.remainingEdits(listing.getOwnerEditCount()));
+        r.setRejectionReason(listing.getRejectionReason());
     }
 
     public String buildPhotoUrl(Long photoId) {

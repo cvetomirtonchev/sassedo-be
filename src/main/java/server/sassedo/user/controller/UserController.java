@@ -23,12 +23,14 @@ import server.sassedo.user.data.dto.UserPreferencesDto;
 import server.sassedo.user.data.network.UpdateUserRequest;
 import server.sassedo.user.data.network.request.AdminBlockUserRequest;
 import server.sassedo.user.data.network.request.AdminUpdateUserRequest;
+import server.sassedo.user.data.network.request.DeleteAccountRequest;
 import server.sassedo.user.data.network.request.UpdatePasswordRequest;
 import server.sassedo.user.data.network.request.UpdateProfileRequest;
 import server.sassedo.user.data.network.request.UpdateUserPreferencesRequest;
 import server.sassedo.user.data.network.request.UpdateUserRoleRequest;
 import server.sassedo.user.data.network.response.UserResponse;
 import server.sassedo.user.data.network.response.UserRolesResponse;
+import server.sassedo.user.service.user.AccountDeletionService;
 import server.sassedo.user.service.user.UserService;
 import server.sassedo.utils.ImageResponses;
 
@@ -47,6 +49,7 @@ import static server.sassedo.utils.ServerUtils.getUserId;
 public class UserController {
 
     private final UserService userService;
+    private final AccountDeletionService accountDeletionService;
     private final JwtUtils jwtUtils;
 
     @GetMapping("/details")
@@ -155,7 +158,7 @@ public class UserController {
     @DeleteMapping("/admin/{id}")
     public ResponseEntity<?> deleteUserByAdmin(@PathVariable Long id) {
         try {
-            userService.deleteUser(id);
+            accountDeletionService.deleteByAdmin(id);
             return ResponseEntity.ok().build();
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());
@@ -181,9 +184,10 @@ public class UserController {
     @GetMapping("/admin/all")
     public ResponseEntity<?> getAll(
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long cityId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "40") int size) {
-        Page<User> users = userService.searchUsers(search, PageRequest.of(page, size, Sort.by("id")));
+        Page<User> users = userService.searchUsers(search, cityId, PageRequest.of(page, size, Sort.by("id")));
         List<UserResponse> content = users.getContent().stream()
                 .map(this::mapUserToResponse).collect(Collectors.toList());
         PageMeta meta = new PageMeta(users.getNumber(), users.getTotalPages(), users.getTotalElements());
@@ -206,11 +210,13 @@ public class UserController {
         }
     }
 
-    @DeleteMapping
-    public ResponseEntity<?> deleteUser(HttpServletRequest request) {
-        Long userId = getUserId(request, jwtUtils);
+    @PostMapping("/delete-account")
+    public ResponseEntity<?> deleteUser(
+            @Valid @RequestBody DeleteAccountRequest deleteAccountRequest,
+            HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
         try {
-            userService.deleteUser(userId);
+            accountDeletionService.deleteOwnAccount(userId, deleteAccountRequest.getCurrentPassword());
             return ResponseEntity.ok().build();
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());

@@ -75,6 +75,7 @@ public class WebSecurityConfig {
                         .requestMatchers(RegexRequestMatcher.regexMatcher("/api/.*/admin.*")).hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/faq/all").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/hero-carousel").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/testimonials/random").permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/hero-carousel/images/\\d+")).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/blog").permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/blog/images/\\d+")).permitAll()

@@ -201,8 +201,30 @@ public class RentalListingController {
         Long userId = getUserId(httpRequest, jwtUtils);
         List<RentalListingResponse> content = listingService.getMyListings(userId).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
-        engagementEnricher.enrich(ListingType.RENTAL, content, userId, false);
+        engagementEnricher.enrich(ListingType.RENTAL, content, userId, true);
         return ResponseEntity.ok(content);
+    }
+
+    @PostMapping("/{id}/resubmit")
+    public ResponseEntity<?> resubmit(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            RentalListing listing = listingService.resubmit(id, userId);
+            return ResponseEntity.ok(mapToResponse(listing));
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest, jwtUtils);
+        try {
+            listingService.deleteByOwner(id, userId);
+            return ResponseEntity.ok().build();
+        } catch (GenericException e) {
+            return ResponseEntity.badRequest().body(e.getErrorResponse());
+        }
     }
 
     @GetMapping("/{id}")
@@ -318,9 +340,10 @@ public class RentalListingController {
     public ResponseEntity<?> adminAll(
             @RequestParam(required = false) ListingStatus status,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long cityId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "40") int size) {
-        Page<RentalListing> listings = listingService.adminSearch(status, search,
+        Page<RentalListing> listings = listingService.adminSearch(status, search, cityId,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
         return ResponseEntity.ok(toPagedResponse(listings));
     }
@@ -338,7 +361,7 @@ public class RentalListingController {
     @PatchMapping("/admin/{id}/status")
     public ResponseEntity<?> adminSetStatus(@PathVariable Long id, @Valid @RequestBody UpdateListingStatusRequest request) {
         try {
-            RentalListing listing = listingService.setStatus(id, request.getStatus());
+            RentalListing listing = listingService.setStatus(id, request.getStatus(), request.getRejectionReason());
             return ResponseEntity.ok(mapToResponse(listing));
         } catch (GenericException e) {
             return ResponseEntity.badRequest().body(e.getErrorResponse());

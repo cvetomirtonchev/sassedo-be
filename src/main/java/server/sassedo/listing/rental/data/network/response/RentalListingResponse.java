@@ -77,4 +77,9 @@ public class RentalListingResponse implements EngagementAware {
     private long favoriteCount;
     private long viewCount;
     private boolean favoritedByMe;
+
+    private int editCount;
+    private int maxEdits;
+    private int remainingEdits;
+    private String rejectionReason;
 }

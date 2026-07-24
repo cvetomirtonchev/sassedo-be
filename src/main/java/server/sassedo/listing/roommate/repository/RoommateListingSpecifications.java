@@ -11,7 +11,9 @@ import server.sassedo.listing.common.ListingFilter;
 import server.sassedo.listing.common.ListingStatus;
 import server.sassedo.listing.common.PetPolicy;
 import server.sassedo.listing.common.RoomAmenity;
+import server.sassedo.listing.common.RoommateSexPreference;
 import server.sassedo.listing.roommate.data.dto.RoommateListing;
+import server.sassedo.user.data.dto.Sex;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -118,11 +120,11 @@ public final class RoommateListingSpecifications {
                         cb.isNull(root.get("ageMin")),
                         cb.lessThanOrEqualTo(root.get("ageMin"), f.getAgeMax())));
             }
-            // A listing with no gender preference (null) accepts anyone, so it always matches.
+            // A listing with no gender preference (null or explicit NO_PREFERENCE) accepts anyone.
             if (f.getPreferredSex() != null) {
                 predicates.add(cb.or(
                         cb.isNull(root.get("preferredSex")),
-                        cb.equal(root.get("preferredSex"), f.getPreferredSex())));
+                        root.get("preferredSex").in(acceptedSexPreferences(f.getPreferredSex()))));
             }
             // Pets are row-aware: with-property listings expose the petsAllowed flag, while
             // without-property listers describe what they accept via petPolicy. Deciding per row
@@ -186,5 +188,13 @@ public final class RoommateListingSpecifications {
         } catch (IllegalArgumentException | NullPointerException e) {
             return null;
         }
+    }
+
+    static List<RoommateSexPreference> acceptedSexPreferences(Sex sex) {
+        return switch (sex) {
+            case MALE -> List.of(RoommateSexPreference.MALE, RoommateSexPreference.NO_PREFERENCE);
+            case FEMALE -> List.of(RoommateSexPreference.FEMALE, RoommateSexPreference.NO_PREFERENCE);
+            case OTHER -> List.of(RoommateSexPreference.NO_PREFERENCE);
+        };
     }
 }

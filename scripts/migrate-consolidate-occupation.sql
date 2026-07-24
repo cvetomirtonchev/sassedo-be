@@ -73,5 +73,4 @@ ALTER TABLE roommate_listings
         'OTHER',
         'PREFER_NOT_TO_SAY'
     ) NULL,
-    DROP COLUMN occupation_preference,
-    DROP COLUMN people_in_property;
+    DROP COLUMN occupation_preference;
